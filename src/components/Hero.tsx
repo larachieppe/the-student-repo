@@ -32,7 +32,6 @@ export default function Hero() {
             <p className="mt-3 text-center text-xs text-brand-sub">
               Join 700+ hackers already in the network.
             </p>
-            {/* <p className="mt-3 text-center text-xs text-brand-sub">}
           </div>
         </div>
         {/*

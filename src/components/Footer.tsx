@@ -22,7 +22,13 @@ export default function Footer() {
         <div className="">
           <p className=" text-white font-semibold">Connect</p>
           <p className="text-white">
-            Questions? Reach out to us at hi@repo.reachcapital.com
+            Questions? Reach out to us at{" "}
+            <a
+              href="mailto:hi@repo.reachcapital.com"
+              className="underline hover:opacity-80"
+            >
+              hi@repo.reachcapital.com
+            </a>
           </p>
         </div>
       </div>
