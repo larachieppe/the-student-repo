@@ -2,14 +2,21 @@ import * as React from "react";
 
 interface CompanyCardProps {
   children: React.ReactNode;
+  /** Optional extra classes so we can tweak size from the parent grid */
+  className?: string;
 }
 
-export function CompanyCard({ children }: CompanyCardProps) {
+export function CompanyCard({ children, className = "" }: CompanyCardProps) {
   return (
-    <div className="flex items-center justify-center rounded-xl border border-[rgba(5,37,164,1)] px-8 py-10 text-center shadow-[0_0_0_2px_rgba(5,37,164,1)_inset]">
-      <div className="text-4xl font-semibold leading-none text-[#0a0f0a]">
-        {children}
-      </div>
+    <div
+      className={
+        // ↓ smaller padding, same rounded corners & border
+        "flex items-center justify-center rounded-xl border border-[rgba(5,37,164,1)] px-5 py-5 text-center " +
+        "shadow-[0_0_0_2px_rgba(5,37,164,1)_inset] " +
+        className
+      }
+    >
+      {children}
     </div>
   );
 }

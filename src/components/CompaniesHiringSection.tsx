@@ -29,24 +29,24 @@ export default function CompaniesHiringSection(): JSX.Element {
         </p>
       </div>
 
-      <div className="mx-auto mt-12 grid max-w-6xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {logos.map((l) => (
-          <CompanyCard key={l.alt}>
-            {/* fixed card height for perfect row alignment */}
-            <div className="flex h-15 w-full items-center justify-center">
-              {/* fixed logo box height; we scale inside this box */}
-              <div className="h-16 sm:h-20">
-                <img
-                  src={l.src}
-                  alt={l.alt}
-                  className="h-full w-auto object-contain origin-center"
-                  style={{ transform: `scale(${l.scale})` }}
-                />
-              </div>
-            </div>
-          </CompanyCard>
-        ))}
+      <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+  {logos.map((l) => (
+    <CompanyCard key={l.alt}>
+      {/* ↓ shorter card height */}
+      <div className="flex h-24 sm:h-28 w-full items-center justify-center">
+        {/* ↓ smaller logo base height (your per-logo scale() can stay) */}
+        <div className="h-10 sm:h-12">
+          <img
+            src={l.src}
+            alt={l.alt}
+            className="h-full w-auto object-contain origin-center"
+            style={{ transform: `scale(${l.scale ?? 1})` }}
+          />
+        </div>
       </div>
+    </CompanyCard>
+  ))}
+</div>
     </section>
   );
 };
