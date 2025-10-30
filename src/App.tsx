@@ -2,8 +2,9 @@ import React from "react";
 import NavBar from "./components/NavBar";
 import Hero from "./components/Hero";
 import Footer from "./components/Footer";
-import FAQ from "./components/Faq";
+import FAQ from "./components/faq";
 import FeatureGrid from "./components/FeatureGrid";
+import CompaniesHiringSection from "./components/CompaniesHiringSection";
 
 function Section(props: {
   id?: string;
@@ -90,19 +91,7 @@ export default function App() {
           <FeatureGrid />
         </Section>
 
-        <Section
-          id=""
-          eyebrow=""
-          title="COMPANIES HIRING IN OUR PORTFOLIO"
-          copy="Create a profile that highlights projects, skills, and interests—then opt into opportunities that fit you."
-        >
-          <TwoColumns
-            leftTitle="Own your profile"
-            leftBody="Edit anytime, highlight projects and skills, and control what’s shared with partner companies."
-            rightTitle="Precision filters"
-            rightBody="Companies find you by stack, interests, and availability—so every conversation is higher-signal."
-          />
-        </Section>
+        <CompaniesHiringSection />
 
         <Section
           id="blue"
