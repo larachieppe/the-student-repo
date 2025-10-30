@@ -1,4 +1,5 @@
 import logo from "../assets/logo.png";
+import { Link } from "react-router-dom";
 
 export default function NavBar() {
   return (
@@ -35,12 +36,12 @@ export default function NavBar() {
           >
             LOG IN
           </a>
-          <a
+          <Link
             className="rounded-lg bg-brand-blue px-3 py-1.5 text-sm text-white hover:brightness-95"
-            href="#get-started"
+            to="/form"
           >
             SUBMIT YOUR PROFILE
-          </a>
+          </Link>
         </div>
       </nav>
     </header>

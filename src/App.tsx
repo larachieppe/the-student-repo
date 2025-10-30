@@ -2,8 +2,10 @@ import React from "react";
 import NavBar from "./components/NavBar";
 import Hero from "./components/Hero";
 import Footer from "./components/Footer";
-import FAQ from "./components/Faq";
+import FAQ from "./components/faq";
 import FeatureGrid from "./components/FeatureGrid";
+import { Link, Routes, Route } from "react-router-dom";
+import FormPage from "./components/FormPage";
 
 function Section(props: {
   id?: string;
@@ -77,65 +79,67 @@ function TwoColumns({
 
 export default function App() {
   return (
-    <>
-      <NavBar />
-      <main className="font-mono">
-        <Hero />
-
-        <Section
-          id="about"
-          eyebrow=""
-          title="WHAT HAPPENS WHEN YOU DROP YOUR PROFILE?"
-          copy="Built for you. Curated by us. Shared directly with 130+ startups in our portfolio."
-        >
-          <FeatureGrid />
-        </Section>
-
-        <Section
-          id="partners"
-          eyebrow=""
-          title="COMPANIES HIRING IN OUR PORTFOLIO"
-          copy="Create a profile that highlights projects, skills, and interests—then opt into opportunities that fit you."
-        >
-          <TwoColumns
-            leftTitle="Own your profile"
-            leftBody="Edit anytime, highlight projects and skills, and control what’s shared with partner companies."
-            rightTitle="Precision filters"
-            rightBody="Companies find you by stack, interests, and availability—so every conversation is higher-signal."
-          />
-        </Section>
-
-        <Section
-          id="newsletter"
-          eyebrow=""
-          title="STAY IN THE LOOP"
-          copy="Get the latest opportunities, success stories, and community updates across learning, work and health delivered straight to your inbox."
-        >
-          <a
-            className="rounded-lg bg-brand-lime text-sm text-brand-blue hover:brightness-95 p-4"
-            href="#get-started"
-          >
-            SUBSCRIBE TO THE REPO NEWSLETTER →
-          </a>
-        </Section>
-
-        <Section
-          id=""
-          eyebrow=""
-          title="CHALLENGE ACCEPTED?"
-          copy="Join hundreds of technical students building careers with innovative companies."
-        >
-          <a
-            className="rounded-lg bg-brand-blue text-sm text-white hover:brightness-95 p-4"
-            href="#get-started"
-          >
-            SUBMIT YOUR PROFILE
-          </a>
-        </Section>
-
-        <FAQ />
-      </main>
-      <Footer />
-    </>
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <>
+            <NavBar />
+            <main className={"font-mono"}>
+              <Hero />
+              <Section
+                eyebrow=""
+                title="WHAT HAPPENS WHEN YOU DROP YOUR PROFILE?"
+                copy="Built for you. Curated by us. Shared directly with 130+ startups in our portfolio."
+              >
+                <FeatureGrid />
+              </Section>
+              <Section
+                id=""
+                eyebrow=""
+                title="COMPANIES HIRING IN OUR PORTFOLIO"
+                copy="Create a profile that highlights projects, skills, and interests—then opt into opportunities that fit you."
+              >
+                <TwoColumns
+                  leftTitle="Own your profile"
+                  leftBody="Edit anytime, highlight projects and skills, and control what’s shared with partner companies."
+                  rightTitle="Precision filters"
+                  rightBody="Companies find you by stack, interests, and availability—so every conversation is higher-signal."
+                />
+              </Section>
+              <Section
+                id="blue"
+                eyebrow=""
+                title="STAY IN THE LOOP"
+                copy="Get the latest opportunities, success stories, and community updates across learning, work and health delivered straight to your inbox."
+              >
+                <a
+                  className="rounded-lg bg-brand-lime text-sm text-brand-blue hover:brightness-95 p-4"
+                  href="#get-started"
+                >
+                  SUBSCRIBE TO THE REPO NEWSLETTER →
+                </a>
+              </Section>
+              <Section
+                id=""
+                eyebrow=""
+                title="CHALLENGE ACCEPTED?"
+                copy="Join hundreds of technical students building careers with innovative companies."
+              >
+                <Link
+                  className="rounded-lg bg-brand-blue text-sm text-white hover:brightness-95 p-4"
+                  to="/form"
+                >
+                  SUBMIT YOUR PROFILE
+                </Link>
+              </Section>
+              <FAQ />
+            </main>
+            <Footer />
+          </>
+        }
+      />
+      <Route path="/form" element={<FormPage />} />
+    </Routes>
   );
 }
