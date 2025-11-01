@@ -7,6 +7,9 @@ import FeatureGrid from "./components/FeatureGrid";
 import { Link, Routes, Route } from "react-router-dom";
 import FormPage from "./components/FormPage";
 import CompaniesHiringSection from "./components/CompaniesHiringSection";
+import LoginPage from "./components/LoginPage";
+import SubmittedPage from "./pages/SubmittedPage";
+import StudentPortal from "./pages/StudentPortal";
 
 function Section(props: {
   id?: string;
@@ -16,13 +19,13 @@ function Section(props: {
   children?: React.ReactNode;
 }) {
   const { id, eyebrow, title, copy, children } = props;
-  const isBlue = id === "blue";
+  const isBlue = id === "newsletter";
 
   return (
     <section
       id={id}
       className={`text-center border-t border-brand-line/60 py-16 md:py-20 ${
-        isBlue ? "bg-brand-blue text-white" : "bg-brand-bg text-black"
+        isBlue ? "bg-brand-blue text-white" : "bg-white text-black"
       }`}
     >
       <div className="container-tight">
@@ -86,9 +89,10 @@ export default function App() {
         element={
           <>
             <NavBar />
-            <main className={"font-mono"}>
+            <main className="font-mono bg-white">
               <Hero />
               <Section
+                id="about"
                 eyebrow=""
                 title="WHAT HAPPENS WHEN YOU DROP YOUR PROFILE?"
                 copy="Built for you. Curated by us. Shared directly with 130+ startups in our portfolio."
@@ -99,7 +103,7 @@ export default function App() {
               <CompaniesHiringSection />
 
               <Section
-                id="blue"
+                id="newsletter"
                 eyebrow=""
                 title="STAY IN THE LOOP"
                 copy="Get the latest opportunities, success stories, and community updates across learning, work and health delivered straight to your inbox."
@@ -123,6 +127,11 @@ export default function App() {
                 >
                   SUBMIT YOUR PROFILE
                 </Link>
+                <div className="mt-10">
+                  <p className="mt-3 text-center text-xs text-brand-sub">
+                    Free to join • No spam
+                  </p>
+                </div>
               </Section>
               <FAQ />
             </main>
@@ -131,6 +140,9 @@ export default function App() {
         }
       />
       <Route path="/form" element={<FormPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/submitted" element={<SubmittedPage />} />
+      <Route path="/student-portal" element={<StudentPortal />} />
     </Routes>
   );
 }

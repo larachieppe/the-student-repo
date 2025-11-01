@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 function AvatarTile({
   src,
   alt,
@@ -76,7 +77,7 @@ export default function Hero() {
     <section id="home" className="relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10">
         {/* soft lime glow */}
-        <div className="absolute left-1/2 top-[-10%] h-[450px] w-[450px] -translate-x-1/2 rounded-full bg-brand-blue/10 blur-3xl" />
+        <div className="absolute left-1/2 top-[-10%] h-[450px] w-[450px] -translate-x-1/2 rounded-full bg-brand-blue blur-3xl" />
       </div>
       <div className="container-tight grid gap-8 py-16 md:grid-cols-2 md:py-24">
         <div className="flex flex-col items-start justify-center">
@@ -91,12 +92,12 @@ export default function Hero() {
             career-defining opportunities.
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <a
-              href="#get-started"
+            <Link
+              to="/form"
               className="rounded-xl bg-brand-blue px-5 py-3 text-white shadow-soft hover:brightness-95"
             >
               SUBMIT YOUR PROFILE
-            </a>
+            </Link>
           </div>
           <div>
             <p className="mt-3 text-center text-xs text-brand-sub">
