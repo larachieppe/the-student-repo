@@ -9,9 +9,45 @@ import googleImage from "../assets/loginGoogle.png";
 import NavBar from "./NavBar";
 import Footer from "./Footer";
 import { Link } from "react-router-dom";
+import { useAuth } from "../AuthContext";
 
 export default function LoginPage() {
-  const [role, setRole] = useState("business");
+  const [role, setRole] = useState<"student" | "business" | "admin">(
+    "business"
+  );
+  const { signInWithEmail, signInWithProvider } = useAuth();
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState<"email" | "google" | null>(null);
+
+  const handleEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    setLoading("email");
+    try {
+      localStorage.setItem("loginRole", role);
+
+      const { error } = await signInWithEmail(email);
+      if (error) setErr(error.message);
+      else setSent(true);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setErr(null);
+    setLoading("google");
+    try {
+      localStorage.setItem("loginRole", role);
+
+      const { error } = await signInWithProvider("google");
+      if (error) setErr(error.message);
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const roles = [
     {
@@ -77,9 +113,18 @@ export default function LoginPage() {
           {/* Login Form */}
           <div className="border rounded-xl p-6 text-left">
             {/* Google Sign-in */}
-            <button className="w-full flex items-center justify-center gap-2 border rounded-lg py-2 mb-4 bg-brand-blue text-white hover:bg-brand-blue transition">
+            <button
+              type="button"
+              onClick={handleGoogle}
+              disabled={loading === "google"}
+              className="w-full flex items-center justify-center gap-2 border rounded-lg py-2 mb-4 bg-brand-blue text-white hover:brightness-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
               <img src={googleImage} alt="Google icon" className="w-5 h-5" />
-              <span>Continue with Google</span>
+              <span>
+                {loading === "google"
+                  ? "Continuing..."
+                  : "Continue with Google"}
+              </span>{" "}
             </button>
 
             <div className="flex items-center mb-4">

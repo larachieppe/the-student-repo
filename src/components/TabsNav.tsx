@@ -130,7 +130,7 @@ export default function TabsNav() {
 
         {/* BUSINESSES */}
         <TabPanel id="businesses" active={active}>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 text-center">
             {[
               "Acme Labs",
               "Learnly",
@@ -141,7 +141,7 @@ export default function TabsNav() {
             ].map((n) => (
               <div
                 key={n}
-                className="rounded-2xl border border-brand-line p-5 bg-white"
+                className="rounded-2xl border-4 border-brand-blue/20 p-5 bg-white shadow-lg"
               >
                 <p className="font-mono font-semibold">{n}</p>
                 <p className="text-sm text-brand-sub mt-1">

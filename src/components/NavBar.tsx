@@ -1,9 +1,11 @@
 import logo from "../assets/logo.png";
 import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../AuthContext";
 
 export default function NavBar() {
   const { pathname } = useLocation();
   const isHome = pathname === "/";
+  const { user, signOut } = useAuth();
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -24,7 +26,6 @@ export default function NavBar() {
             Reach&nbsp;Capital
           </span>
         </Link>
-
         {isHome && (
           <div className="hidden gap-6 text-sm text-brand-sub md:flex">
             <a href="#about" className="hover:text-brand-text">
@@ -43,12 +44,24 @@ export default function NavBar() {
         )}
 
         <div className="flex items-center gap-3">
-          <Link
-            className="hidden rounded-lg px-3 py-1.5 text-sm text-brand-text hover:border md:inline-block"
-            to="/login"
-          >
-            LOG IN
-          </Link>
+          {!user ? (
+            <Link
+              className="hidden rounded-lg px-3 py-1.5 text-sm text-brand-text hover:border md:inline-block"
+              to="/login"
+            >
+              LOG IN
+            </Link>
+          ) : (
+            <button
+              onClick={() => {
+                signOut();
+                scrollToTop();
+              }}
+              className="hidden rounded-lg px-3 py-1.5 text-sm text-brand-text hover:border md:inline-block"
+            >
+              LOG OUT
+            </button>
+          )}
           <Link
             className="rounded-lg bg-brand-blue px-3 py-1.5 text-sm text-white hover:brightness-95"
             to="/form"
