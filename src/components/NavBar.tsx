@@ -56,7 +56,12 @@ export default function NavBar({ activeTab, onChangeTab }: NavBarProps) {
         {/* right side */}
         <div className="flex items-center gap-3">
           {!user ? (
-            <>{/* login / submit buttons */}</>
+            <Link
+              className="hidden rounded-lg px-3 py-1.5 text-sm text-brand-text hover:border md:inline-block"
+              to="/login"
+            >
+              LOG IN
+            </Link>
           ) : (
             <>
               <div className="bg-brand-blue h-8 w-8">
