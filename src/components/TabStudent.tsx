@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-export default function TabsNav() {
+export default function TabStudent() {
   const tabDefs = [
     { key: "edit", label: "EDIT PROFILE" },
     { key: "businesses", label: "BUSINESSES" },
@@ -122,7 +122,7 @@ export default function TabsNav() {
                 placeholder="Humble flex, we want to hear the things you’re proud of! Any outlier things you have done in LIFE. Cool projects, hacks, viral moments, whatever you are most proud of. What non-traditional things were you doing growing up?"
               />
             </div>
-            <button className="mt-5 px-5 py-2 rounded-lg bg-brand-blue text-white font-mono font-semibold hover:brightness-95">
+            <button className="mt-5 px-5 py-2 rounded-lg text-white font-mono font-semibold hover:brightness-95">
               Save changes
             </button>
           </div>
@@ -147,7 +147,7 @@ export default function TabsNav() {
                 <p className="text-sm text-brand-sub mt-1">
                   Early-stage • Open roles
                 </p>
-                <button className="mt-4 text-xs px-3 py-1 rounded bg-brand-blue text-white font-mono hover:brightness-95">
+                <button className="mt-4 text-xs px-3 py-1 rounded text-white font-mono hover:brightness-95">
                   View details
                 </button>
               </div>

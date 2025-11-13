@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import { useNavigate } from "react-router-dom";
 
 type AuthContextType = {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signInWithEmail: (email: string) => Promise<{ error: any }>;
+  signInWithEmail: (email: string, role?: string) => Promise<{ error: any }>;
   signInWithProvider: (
     provider: "google" | "github"
   ) => Promise<{ error: any }>;
@@ -26,14 +27,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
+  // Load current session once on mount
   useEffect(() => {
-    const current = supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       setSession(data.session ?? null);
       setUser(data.session?.user ?? null);
       setLoading(false);
+
+      const role = data.session?.user?.user_metadata?.role;
+      if (role) {
+        const currentPath = window.location.pathname;
+        if (
+          currentPath === "/" ||
+          currentPath === "/login" ||
+          currentPath === "/auth/callback"
+        ) {
+          if (role === "student") navigate("/student-portal");
+          else if (role === "business") navigate("/business-portal");
+          else if (role === "admin") navigate("/admin-portal");
+        }
+      }
     });
 
+    //Keep session in sync; no redirects here
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, sess) => {
@@ -45,15 +63,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signInWithEmail = async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({ email });
+  // Send magic link; attach role & send user back to /auth/callback
+  const signInWithEmail = async (email: string, role?: string) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        data: { role }, // appears later as user.user_metadata.role
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
     return { error };
   };
 
+  // OAuth → also return to /auth/callback for unified handling
   const signInWithProvider = async (provider: "google" | "github") => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: `${window.location.origin}/auth/callback` }, // 🔧 changed
     });
     return { error };
   };

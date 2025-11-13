@@ -81,7 +81,7 @@ export default function Hero() {
       </div>
       <div className="container-tight grid gap-8 py-16 md:grid-cols-2 md:py-24">
         <div className="flex flex-col items-start justify-center">
-          <h1 className="mb-5 font-mono text-4xl font-bold tracking-tight md:text-5xl">
+          <h1 className="mb-5 text-4xl font-bold tracking-tight md:text-5xl">
             JOIN THE STUDENT REPO
           </h1>
           <p className="mb-8 max-w-prose text-brand-text">

@@ -46,7 +46,7 @@ export default function FAQ() {
     <section id="faq" className="border-t py-16 md:py-20">
       <div className="container-tight">
         <div className="rounded-2xl border border-brand-line bg-gradient-to-br bg-brand-blue p-8 text-center shadow-soft">
-          <h3 className="font-mono text-2xl font-bold text-white">FAQ</h3>
+          <h3 className="font text-2xl font-bold text-white">FAQ</h3>
           <p className="mx-auto mt-2 max-w-prose text-white">
             Common questions about how the Repo network helps you.
           </p>
@@ -60,7 +60,7 @@ export default function FAQ() {
                     aria-expanded={isOpen}
                     aria-controls={`faq-panel-${index}`}
                     onClick={() => toggle(index)}
-                    className="flex w-full items-center justify-between gap-4 py-3 text-left font-mono text-lg font-bold text-white hover:opacity-80 focus:outline-none"
+                    className="flex w-full items-center justify-between gap-4 py-3 text-left font text-lg font-bold text-white hover:opacity-80 focus:outline-none"
                   >
                     <span>
                       {isOpen ? "-" : "+"} {item.q}

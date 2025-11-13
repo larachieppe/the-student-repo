@@ -5,11 +5,14 @@ import Footer from "./components/Footer";
 import FAQ from "./components/faq";
 import FeatureGrid from "./components/FeatureGrid";
 import { Link, Routes, Route } from "react-router-dom";
-import FormPage from "./components/FormPage";
+import FormPage from "./pages/FormPage";
 import CompaniesHiringSection from "./components/CompaniesHiringSection";
-import LoginPage from "./components/LoginPage";
+import LoginPage from "./pages/LoginPage";
 import SubmittedPage from "./pages/SubmittedPage";
+import AuthCallback from "./AuthCallback";
 import StudentPortal from "./pages/StudentPortal";
+import BusinessPortal from "./pages/BusinessPortal";
+import RCPortal from "./pages/RCPortal";
 
 function Section(props: {
   id?: string;
@@ -89,7 +92,7 @@ export default function App() {
         element={
           <>
             <NavBar />
-            <main className="font-mono bg-white">
+            <main className="font-sans bg-white">
               <Hero />
               <Section
                 id="about"
@@ -142,7 +145,10 @@ export default function App() {
       <Route path="/form" element={<FormPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/submitted" element={<SubmittedPage />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/student-portal" element={<StudentPortal />} />
+      <Route path="/business-portal" element={<BusinessPortal />} />
+      <Route path="/admin-portal" element={<RCPortal />} />
     </Routes>
   );
 }

@@ -4,13 +4,15 @@ import App from "./App";
 import "./assets/styles/index.css";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./AuthContext";
+import PortalRedirect from "./PortalRedirect";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
+        <PortalRedirect />
         <App />
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );
