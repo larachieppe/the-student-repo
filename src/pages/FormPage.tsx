@@ -1,10 +1,27 @@
 import { useState } from "react";
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabase";
+
+type FormState = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  school: string;
+  graduationYear: string;
+  major: string;
+  github: string;
+  linkedin: string;
+  typeOfWork: string[];
+  relocating: string;
+  skills: string[];
+  sideProjects: string;
+  flex: string;
+};
 
 export default function FormPage() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     firstName: "",
     lastName: "",
     email: "",
@@ -31,12 +48,16 @@ export default function FormPage() {
 
   const workOptions = ["Part-time", "Full-time", "Opportunistic", "Internship"];
 
-  const handleChange = (e) => {
+  const navigate = useNavigate();
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
   };
 
-  const handleMultiSelect = (name, option) => {
+  const handleMultiSelect = (name: "typeOfWork" | "skills", option: string) => {
     setForm((f) => {
       const exists = f[name].includes(option);
       return {
@@ -60,23 +81,48 @@ export default function FormPage() {
     }
   };
 
-  const handleFilesChange = (e) => {
-    const input = e.target as HTMLInputElement;
-    const selected = Array.from(input.files || []);
-    if (selected.length === 0) return;
-    // Append new files; simple de-dupe by name+size+lastModified
+  const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    if (!selected.length) return;
     setFiles((prev) => {
       const key = (f: File) => `${f.name}-${f.size}-${f.lastModified}`;
       const existingKeys = new Set(prev.map(key));
       const additions = selected.filter((f) => !existingKeys.has(key(f)));
       return [...prev, ...additions];
     });
-    // Allow re-selecting the same file by clearing the input value
-    input.value = "";
+    e.target.value = "";
   };
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const { error } = await supabase.from("submissions").upsert({
+      first_name: form.firstName,
+      last_name: form.lastName,
+      email: form.email,
+      school: form.school,
+      graduation_year: form.graduationYear,
+      major: form.major,
+      github: form.github,
+      linkedin: form.linkedin,
+      type_of_work: form.typeOfWork,
+      relocating: form.relocating,
+      skills: form.skills,
+      side_projects: form.sideProjects,
+      flex: form.flex,
+    });
+
+    if (error) {
+      console.error("Supabase insert error:", error);
+      alert(error.message);
+      return;
+    }
+
+    navigate("/submitted");
   };
 
   return (
@@ -98,10 +144,35 @@ export default function FormPage() {
       </section>
       {/* Form Card */}
       <div className="flex-1 flex flex-col items-center justify-center py-8 bg-transparent">
-        <form className="w-full max-w-2xl bg-white p-8 border border-brand-line rounded-xl shadow mx-auto space-y-6 font-mono">
+        <form
+          className="w-full max-w-2xl bg-white p-8 border border-brand-line rounded-xl shadow mx-auto space-y-6 font-mono"
+          onSubmit={handleSubmit}
+        >
           <div className="flex flex-col gap-1">
             <label className="text-s font-semibold">
               First Name
+              <span
+                style={{
+                  fontSize: "0.7em",
+                  verticalAlign: "super",
+                  color: "blue",
+                  marginLeft: "0.2px",
+                }}
+              >
+                *
+              </span>
+            </label>
+            <input
+              type="text"
+              name="firstName"
+              value={form.firstName}
+              onChange={handleChange}
+              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-mono bg-gray-100 focus:outline-none focus:ring-1 focus:ring-brand-blue"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-s font-semibold">
+              Last Name
               <span
                 style={{
                   fontSize: "0.7em",
@@ -485,12 +556,12 @@ export default function FormPage() {
             )}
           </div>
 
-          <Link
-            to="/submitted"
+          <button
+            type="submit"
             className="w-full mx-auto p-4 bg-brand-blue text-white rounded-lg py-2.5 font-semibold md:text-lg tracking-wide shadow hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-brand-blue font-mono flex justify-center"
           >
             SUBMIT YOUR PROFILE
-          </Link>
+          </button>
         </form>
       </div>
       <Footer />

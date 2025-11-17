@@ -1,5 +1,5 @@
-// TabBusiness.tsx
 import { useRef } from "react";
+import type { BusinessTabKey } from "../tabTypes";
 
 const tabDefs = [
   { key: "students", label: "STUDENTS" },
@@ -7,14 +7,14 @@ const tabDefs = [
   { key: "messages", label: "MESSAGES" },
 ] as const;
 
-export type TabKey = (typeof tabDefs)[number]["key"];
+export type TabKey = BusinessTabKey;
 
-interface TabBusinessProps {
-  active: TabKey;
-  onChange: (key: TabKey) => void;
-}
+type Props = {
+  active: BusinessTabKey;
+  onChange: (key: BusinessTabKey) => void;
+};
 
-export default function TabBusiness({ active, onChange }: TabBusinessProps) {
+export default function TabBusiness({ active, onChange }: Props) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const move = (dir: 1 | -1) => {

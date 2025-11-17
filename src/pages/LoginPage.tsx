@@ -1,15 +1,8 @@
 import { useState } from "react";
-import adminImageBlue from "../assets/loginAdminBlue.png";
-import adminImageYellow from "../assets/loginAdminYellow.png";
-import businessImageBlue from "../assets/loginBusinessBlue.png";
-import businessImageYellow from "../assets/loginBusinessYellow.png";
-import studentImageBlue from "../assets/loginStudentBlue.png";
-import studentImageYellow from "../assets/loginStudentYellow.png";
 import googleImage from "../assets/loginGoogle.png";
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
-// import { Link } from "react-router-dom"; // 🔧 CHANGED: no direct nav on email submit
-import { useAuth } from "../AuthContext";
+import { useAuth } from "../useAuth";
 
 type Role = "student" | "business" | "admin"; // ➕ NEW
 
@@ -25,11 +18,21 @@ export default function LoginPage() {
     e.preventDefault();
     setErr(null);
     setLoading("email");
+
     try {
+      const cleanEmail = email.trim().toLowerCase();
+
+      // 🔍 Debug: see exactly what goes to Supabase
+      console.log("[Login] cleanEmail =", JSON.stringify(cleanEmail));
+
       localStorage.setItem("loginRole", role);
-      const { error } = await signInWithEmail(email, role);
-      if (error) setErr(error.message);
-      else setSent(true);
+      const { error } = await signInWithEmail(cleanEmail, role);
+      if (error) {
+        console.error("[Supabase signInWithEmail error]", error);
+        setErr(error.message);
+      } else {
+        setSent(true);
+      }
     } finally {
       setLoading(null);
     }
@@ -54,32 +57,14 @@ export default function LoginPage() {
     {
       name: "student" as const,
       label: "STUDENT",
-      image:
-        role === "student" ? (
-          <img src={studentImageYellow} alt="Student" className="w-10 h-10" />
-        ) : (
-          <img src={studentImageBlue} alt="Student" className="w-10 h-10" />
-        ),
     },
     {
       name: "business" as const,
       label: "BUSINESS",
-      image:
-        role === "business" ? (
-          <img src={businessImageYellow} alt="Business" className="w-10 h-10" />
-        ) : (
-          <img src={businessImageBlue} alt="Business" className="w-10 h-10" />
-        ),
     },
     {
       name: "admin" as const,
       label: "ADMIN",
-      image:
-        role === "admin" ? (
-          <img src={adminImageYellow} alt="Admin" className="w-10 h-10" />
-        ) : (
-          <img src={adminImageBlue} alt="Admin" className="w-10 h-10" />
-        ),
     },
   ];
 
@@ -106,7 +91,6 @@ export default function LoginPage() {
                     : "border-blue-300 text-brand-blue hover:border-brand-blue"
                 }`}
               >
-                <div className="mb-1">{r.image}</div>
                 <span className="text-sm font-semibold">{r.label}</span>
               </button>
             ))}

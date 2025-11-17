@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import type { StudentTabKey } from "../tabTypes";
 
 const tabDefs = [
   { key: "businesses", label: "BUSINESSES" },
@@ -6,14 +7,14 @@ const tabDefs = [
   { key: "edit-profile", label: "EDIT PROFILE" },
 ] as const;
 
-export type TabKey = (typeof tabDefs)[number]["key"];
+export type TabKey = StudentTabKey;
 
-interface TabStudentProps {
-  active: TabKey;
-  onChange: (key: TabKey) => void;
-}
+type Props = {
+  active: StudentTabKey;
+  onChange: (key: StudentTabKey) => void;
+};
 
-export default function TabStudent({ active, onChange }: TabStudentProps) {
+export default function TabStudent({ active, onChange }: Props) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const move = (dir: 1 | -1) => {

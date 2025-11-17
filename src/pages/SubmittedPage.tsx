@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 export default function SubmittedPage() {
   return (
-    <div className="bg-white">
+    <div className="bg-white font-mono">
       <NavBar />
       <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4">
         <h1 className="font-bold text-2xl md:text-3xl mb-4 font-mono">

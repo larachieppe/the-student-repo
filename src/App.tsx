@@ -10,9 +10,9 @@ import CompaniesHiringSection from "./components/CompaniesHiringSection";
 import LoginPage from "./pages/LoginPage";
 import SubmittedPage from "./pages/SubmittedPage";
 import AuthCallback from "./AuthCallback";
-import StudentPortal from "./pages/StudentPortal";
 import BusinessPortal from "./pages/BusinessPortal";
 import RCPortal from "./pages/RCPortal";
+import StudentRedirectGate from "./components/StudentRedirectGate";
 
 function Section(props: {
   id?: string;
@@ -44,43 +44,6 @@ function Section(props: {
         {children}
       </div>
     </section>
-  );
-}
-
-function TwoColumns({
-  leftTitle,
-  leftBody,
-  rightTitle,
-  rightBody,
-}: {
-  leftTitle: string;
-  leftBody: string;
-  rightTitle: string;
-  rightBody: string;
-}) {
-  return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <div className="rounded-xl border border-brand-line bg-brand-blue p-6">
-        <div className="mb-3 text-white font-semibold">{leftTitle}</div>
-        <p className="text-white">{leftBody}</p>
-        <a
-          href="#students"
-          className="mt-4 inline-block rounded-lg border border-brand-line px-3 py-2 text-sm hover:bg-brand-bg"
-        >
-          Learn more
-        </a>
-      </div>
-      <div className="rounded-xl border border-brand-line bg-brand-blue p-6">
-        <div className="mb-3 text-white font-semibold">{rightTitle}</div>
-        <p className="text-white">{rightBody}</p>
-        <a
-          href="#businesses"
-          className="mt-4 inline-block rounded-lg border border-brand-line px-3 py-2 text-sm hover:bg-brand-bg"
-        >
-          Explore
-        </a>
-      </div>
-    </div>
   );
 }
 
@@ -146,7 +109,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/submitted" element={<SubmittedPage />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/student-portal" element={<StudentPortal />} />
+      <Route path="/student-portal" element={<StudentRedirectGate />} />
       <Route path="/business-portal" element={<BusinessPortal />} />
       <Route path="/admin-portal" element={<RCPortal />} />
     </Routes>

@@ -1,7 +1,7 @@
 // src/components/PersistedPortalRedirect.tsx
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "./useAuth";
 
 export default function PortalRedirect() {
   const { user, loading } = useAuth();
