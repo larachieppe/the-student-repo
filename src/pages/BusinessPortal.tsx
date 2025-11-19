@@ -10,11 +10,36 @@ import MessagesSection from "../components/ConversationComponent";
 import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
 
+type Project = {
+  id: string;
+  title: string;
+  description: string;
+  tags: string[];
+  projectImage?: string;
+  projectUrl?: string;
+  authorName: string;
+  authorSchool: string;
+  studentId: string;
+};
+
+type SubmissionRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  school: string;
+  graduation_year: string;
+  side_projects: string | null;
+  skills?: string[] | null;
+  github?: string | null;
+};
+
 export default function BusinessPortal() {
   const [activeTab, setActiveTab] = useState<TabKey>("students");
   const [activeSubtab, setActiveSubtab] = useState<SubtabKey>("humble");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [profilesCount, setProfilesCount] = useState<number | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
   const [initialConversationId, setInitialConversationId] = useState<
     string | null
   >(null);
@@ -45,6 +70,65 @@ export default function BusinessPortal() {
     setActiveTab("messages");
   };
 
+  // Parse side_projects text into project objects
+  const parseProjects = (submissions: SubmissionRow[]): Project[] => {
+    const parsedProjects: Project[] = [];
+
+    submissions.forEach((submission) => {
+      if (!submission.side_projects || !submission.side_projects.trim()) {
+        return;
+      }
+
+      const authorName = `${submission.first_name} ${submission.last_name}`;
+      const graduationYear = submission.graduation_year?.slice(-2) || "";
+      const authorSchool = `${submission.school}${graduationYear ? ` '${graduationYear}` : ""}`;
+
+      const projectText = submission.side_projects.trim();
+      
+      // Try to extract URL from text (look for http/https links)
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const urls = projectText.match(urlRegex) || [];
+      const projectUrl = urls[0] || undefined;
+
+      // Remove URLs from description
+      let description = projectText.replace(urlRegex, "").trim();
+
+      // Try to extract title (first line if it's short, otherwise use default)
+      const lines = description.split("\n").filter(line => line.trim());
+      let title = "Side Project";
+      let finalDescription = description;
+
+      if (lines.length > 0) {
+        const firstLine = lines[0].trim();
+        // If first line is short and doesn't end with punctuation, treat as title
+        if (firstLine.length < 60 && !firstLine.match(/[.!?]$/)) {
+          title = firstLine;
+          finalDescription = lines.slice(1).join("\n").trim() || firstLine;
+        } else {
+          finalDescription = description;
+        }
+      }
+
+      // Use skills as tags, or extract from description if no skills
+      const tags = submission.skills && submission.skills.length > 0 
+        ? submission.skills 
+        : [];
+
+      parsedProjects.push({
+        id: `${submission.id}-project`,
+        title,
+        description: finalDescription,
+        tags,
+        projectUrl,
+        authorName,
+        authorSchool,
+        studentId: submission.id,
+      });
+    });
+
+    return parsedProjects;
+  };
+
   useEffect(() => {
     const loadCount = async () => {
       const { count, error } = await supabase
@@ -61,6 +145,71 @@ export default function BusinessPortal() {
 
     loadCount();
   }, []);
+
+  useEffect(() => {
+    const loadProjects = async () => {
+      if (activeSubtab !== "projects") {
+        setProjects([]);
+        return;
+      }
+
+      setProjectsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("submissions")
+          .select("id, first_name, last_name, school, graduation_year, side_projects, skills, github")
+          .not("side_projects", "is", null)
+          .neq("side_projects", "");
+
+        if (error) {
+          console.error("Error loading projects:", error);
+          console.error("Error details:", JSON.stringify(error, null, 2));
+          setProjects([]);
+          return;
+        }
+
+        console.log("Raw data from Supabase:", data);
+        console.log("Number of submissions fetched:", data?.length || 0);
+
+        if (!data || data.length === 0) {
+          console.log("No submissions found with side_projects");
+          setProjects([]);
+          return;
+        }
+
+        // Log first submission for debugging
+        if (data.length > 0) {
+          console.log("Sample submission:", {
+            id: data[0].id,
+            name: `${data[0].first_name} ${data[0].last_name}`,
+            side_projects: data[0].side_projects,
+            skills: data[0].skills,
+          });
+        }
+
+        const parsed = parseProjects(data as SubmissionRow[]);
+        console.log("Parsed projects:", parsed);
+        
+        // Sort projects
+        const sorted = [...parsed].sort((a, b) => {
+          if (sortOrder === "asc") {
+            return a.authorName.localeCompare(b.authorName);
+          } else {
+            return b.authorName.localeCompare(a.authorName);
+          }
+        });
+
+        setProjects(sorted);
+      } catch (err) {
+        console.error("Error parsing projects:", err);
+        setProjects([]);
+      } finally {
+        setProjectsLoading(false);
+      }
+    };
+
+    loadProjects();
+  }, [activeSubtab, sortOrder]);
 
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans">
@@ -105,9 +254,17 @@ export default function BusinessPortal() {
               </div>
               <div className="flex justify-between mt-4">
                 <div className="text-gray-400">
-                  {profilesCount === null
-                    ? "Loading profiles…"
-                    : `${profilesCount} profiles`}
+                  {activeSubtab === "projects" ? (
+                    projectsLoading ? (
+                      "Loading projects…"
+                    ) : (
+                      `${projects.length} ${projects.length === 1 ? "project" : "projects"}`
+                    )
+                  ) : profilesCount === null ? (
+                    "Loading profiles…"
+                  ) : (
+                    `${profilesCount} profiles`
+                  )}
                 </div>
 
                 <div className="flex items-center justify-end gap-4 mb-4">
@@ -152,14 +309,30 @@ export default function BusinessPortal() {
               )}
               {activeSubtab === "projects" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 mb-4">
-                  <ProjectCard
-                    title="CollabDocs"
-                    description="Real-time collaborative document editing platform with WebSocket support. Real-time collaborative document editing platform with WebSocket support."
-                    tags={["React", "WebSockets", "CRDTs", "Node.js"]}
-                    authorName="Sarah Chen"
-                    authorSchool="MIT ’25"
-                    onViewProject={() => console.log("View project clicked")}
-                  />
+                  {projectsLoading ? (
+                    <div className="col-span-2 text-center text-gray-400 py-8">
+                      Loading projects...
+                    </div>
+                  ) : projects.length === 0 ? (
+                    <div className="col-span-2 text-center text-gray-400 py-8">
+                      No projects found.
+                    </div>
+                  ) : (
+                    projects.map((project) => (
+                      <ProjectCard
+                        key={project.id}
+                        title={project.title}
+                        description={project.description}
+                        tags={project.tags}
+                        authorName={project.authorName}
+                        authorSchool={project.authorSchool}
+                        projectImage={project.projectImage}
+                        projectUrl={project.projectUrl}
+                        studentId={project.studentId}
+                        onStartConversation={handleStartConversation}
+                      />
+                    ))
+                  )}
                 </div>
               )}
               {activeSubtab === "bios" && <BiosSection />}
