@@ -44,6 +44,12 @@ type SubmissionRow = {
   github?: string | null;
 };
 
+type StudentProfile = {
+  id: string;
+  name: string;
+  school: string;
+};
+
 export default function BusinessPortal() {
   const [activeTab, setActiveTab] = useState<TabKey>("students");
   const [activeSubtab, setActiveSubtab] = useState<SubtabKey>("humble");
@@ -58,7 +64,22 @@ export default function BusinessPortal() {
   const [initialConversationId, setInitialConversationId] = useState<
     string | null
   >(null);
+
+  const [shortlist, setShortlist] = useState<StudentProfile[]>([]);
+
   const { user } = useAuth();
+
+  const toggleShortlist = (student: StudentProfile) => {
+    setShortlist((current) => {
+      const alreadyInList = current.some((s) => s.id === student.id);
+
+      if (alreadyInList) {
+        return current.filter((s) => s.id !== student.id);
+      }
+
+      return [...current, student];
+    });
+  };
 
   const handleStartConversation = async (studentId: string) => {
     if (!user) return; // not logged in
@@ -372,6 +393,12 @@ export default function BusinessPortal() {
                         }`;
                         const studentId = submission.email;
 
+                        const studentProfile: StudentProfile = {
+                          id: studentId,
+                          name: authorName,
+                          school: authorSchool,
+                        };
+
                         return (
                           <FlexComponent
                             key={submission.id}
@@ -381,6 +408,12 @@ export default function BusinessPortal() {
                             skills={submission.skills || []}
                             studentId={studentId}
                             onStartConversation={handleStartConversation}
+                            isShortlisted={shortlist.some(
+                              (s) => s.id === studentProfile.id
+                            )}
+                            onToggleShortlist={() =>
+                              toggleShortlist(studentProfile)
+                            }
                           />
                         );
                       })}
@@ -422,8 +455,28 @@ export default function BusinessPortal() {
 
           {activeTab === "shortlist" && (
             <div>
-              <h1 className="text-xl font-semibold">Shortlist</h1>
-              <p>Content for the SHORTLIST tab goes here.</p>
+              <h1 className="text-xl font-semibold mb-4">Shortlist</h1>
+
+              {shortlist.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  You haven&apos;t shortlisted any students yet. Click the flag
+                  icon on a student profile to save it here.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {shortlist.map((student) => (
+                    <FlexComponent
+                      key={student.id}
+                      authorName={student.name}
+                      authorSchool={student.school}
+                      studentId={student.id}
+                      onStartConversation={handleStartConversation}
+                      isShortlisted={shortlist.some((s) => s.id === student.id)}
+                      onToggleShortlist={() => toggleShortlist(student)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </main>

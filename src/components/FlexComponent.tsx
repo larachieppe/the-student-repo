@@ -7,7 +7,10 @@ type FlexCardProps = {
   flexContent?: string;
   skills?: string[];
   onStartConversation?: (studentId: string) => void;
+  isShortlisted?: boolean;
+  onToggleShortlist?: () => void;
 };
+
 
 export default function FlexComponent({
   authorName,
@@ -16,6 +19,8 @@ export default function FlexComponent({
   flexContent,
   skills = [],
   onStartConversation,
+  isShortlisted = false,
+  onToggleShortlist,
 }: FlexCardProps) {
   // Extract title from first line, rest as description
   const lines = flexContent?.split("\n").filter((line) => line.trim()) || [];
@@ -57,12 +62,18 @@ export default function FlexComponent({
           </button>
 
           {/* Bookmark */}
-          <button className="rounded-full p-1.5 hover:bg-slate-100">
+          <button
+            type="button"
+            className="rounded-full p-1.5 hover:bg-slate-100 disabled:opacity-50"
+            onClick={onToggleShortlist}
+            disabled={!onToggleShortlist}
+            aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+          >
             <svg
               width="18"
               height="18"
               viewBox="0 0 24 24"
-              fill="none"
+              fill={isShortlisted ? "currentColor" : "none"}
               stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
