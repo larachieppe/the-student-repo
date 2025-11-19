@@ -1,4 +1,3 @@
-// src/components/MessagesSection.tsx
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
 
@@ -19,8 +18,16 @@ type Message = {
   timestamp: string;
 };
 
-export default function MessagesSection() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+type MessagesSectionProps = {
+  initialConversationId?: string;
+};
+
+export default function MessagesSection({
+  initialConversationId,
+}: MessagesSectionProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialConversationId ?? null
+  );
   const [draft, setDraft] = useState("");
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -64,23 +71,34 @@ export default function MessagesSection() {
       }));
 
       setConversations(mapped);
-      if (mapped[0]) setSelectedId(mapped[0].id);
+
+      if (!mapped.length) {
+        setSelectedId(null);
+        return;
+      }
+
+      if (initialConversationId) {
+        const match = mapped.find((c) => c.id === initialConversationId);
+        setSelectedId(match ? match.id : mapped[0].id);
+      } else if (!selectedId) {
+        setSelectedId(mapped[0].id);
+      }
     };
 
     loadConversations();
-  }, []);
+  }, [initialConversationId]);
 
   useEffect(() => {
     if (!selectedId) return;
 
     const loadMessages = async () => {
-      // 1️⃣ get current user once
+      //get current user once
       const {
         data: { user },
       } = await supabase.auth.getUser();
       const myId = user?.id;
 
-      // 2️⃣ fetch messages for this conversation
+      //fetch messages for this conversation
       const { data, error } = await supabase
         .from("messages")
         .select("id, body, sender_id, created_at, conversation_id")
@@ -92,7 +110,7 @@ export default function MessagesSection() {
         return;
       }
 
-      // 3️⃣ map without any await inside map
+      //map without any await inside map
       setMessages(
         data.map((m: any) => ({
           id: m.id,

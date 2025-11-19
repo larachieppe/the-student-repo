@@ -8,12 +8,42 @@ import ProjectCard from "../components/ProjectComponent";
 import BiosSection from "../components/BioSection";
 import MessagesSection from "../components/ConversationComponent";
 import { supabase } from "../supabase";
+import { useAuth } from "../useAuth";
 
 export default function BusinessPortal() {
   const [activeTab, setActiveTab] = useState<TabKey>("students");
   const [activeSubtab, setActiveSubtab] = useState<SubtabKey>("humble");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [profilesCount, setProfilesCount] = useState<number | null>(null);
+  const [initialConversationId, setInitialConversationId] = useState<
+    string | null
+  >(null);
+  const { user } = useAuth();
+
+  const handleStartConversation = async (studentId: string) => {
+    if (!user) return; // not logged in
+
+    // assume conversations table has business_id & student_id with a UNIQUE constraint on (business_id, student_id)
+    const { data, error } = await supabase
+      .from("conversations")
+      .upsert(
+        {
+          business_id: user.id,
+          student_id: studentId,
+        },
+        { onConflict: "business_id,student_id" }
+      )
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("Error starting conversation", error);
+      return;
+    }
+
+    setInitialConversationId(data.id);
+    setActiveTab("messages");
+  };
 
   useEffect(() => {
     const loadCount = async () => {
@@ -39,7 +69,9 @@ export default function BusinessPortal() {
       {activeTab === "messages" ? (
         // FULL-SCREEN MESSAGES LAYOUT
         <main className="flex-1 flex justify-center items-start bg-white pt-8">
-          <MessagesSection />
+          <MessagesSection
+            initialConversationId={initialConversationId ?? undefined}
+          />
         </main>
       ) : (
         // EXISTING LAYOUT FOR OTHER TABS
@@ -85,7 +117,7 @@ export default function BusinessPortal() {
                       onChange={(e) =>
                         setSortOrder(e.target.value as "asc" | "desc")
                       }
-                      className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 appearance-none pr-8"
+                      className="px-4 py-2 text-sm rounded-lg hover:bg-gray-50 appearance-none pr-8"
                     >
                       <option value="asc">Alphabetical</option>
                       <option value="desc">Recent</option>
@@ -110,7 +142,12 @@ export default function BusinessPortal() {
               </div>
               {activeSubtab === "humble" && (
                 <div className="flex items-center justify-center">
-                  <FlexComponent />
+                  <FlexComponent
+                    authorName="Sarah Chen"
+                    authorSchool="MIT ’25"
+                    studentId="some-student-id"
+                    onStartConversation={handleStartConversation}
+                  />
                 </div>
               )}
               {activeSubtab === "projects" && (

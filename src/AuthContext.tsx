@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { useNavigate } from "react-router-dom";
@@ -14,14 +14,9 @@ export type AuthContextType = {
   signOut: () => Promise<void>;
 };
 
-export const AuthContext = createContext<AuthContextType>({
-  user: null,
-  session: null,
-  loading: true,
-  signInWithEmail: async () => ({ error: null }),
-  signInWithProvider: async () => ({ error: null }),
-  signOut: async () => {},
-});
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined
+);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);

@@ -1,4 +1,18 @@
-export default function FlexComponent() {
+import React from "react";
+
+type FlexCardProps = {
+  authorName: string;
+  authorSchool: string;
+  studentId: string;
+  onStartConversation?: (studentId: string) => void;
+};
+
+export default function FlexComponent({
+  authorName,
+  authorSchool,
+  studentId,
+  onStartConversation,
+}: FlexCardProps) {
   return (
     <article className="max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       {/* Top: title + icons */}
@@ -16,8 +30,12 @@ export default function FlexComponent() {
 
         {/* Comment + Bookmark icons */}
         <div className="flex items-center gap-3 text-slate-400">
-          {/* Comment */}
-          <button className="rounded-full p-1.5 hover:bg-slate-100">
+          {/* Comment → tell parent to start a conversation */}
+          <button
+            type="button"
+            className="rounded-full p-1.5 hover:bg-slate-100"
+            onClick={() => onStartConversation?.(studentId)}
+          >
             <svg
               width="18"
               height="18"
@@ -51,17 +69,27 @@ export default function FlexComponent() {
           </button>
         </div>
       </div>
-      {/* Bottom section */}
-      <div className="flex items-center justify-between px-6 py-4">
-        {/* Author */}
-        <div className="flex items-center gap-3">
-          <div className="text-xs">
-            <div className="font-medium text-slate-900">Sarah Chen</div>
-            <div className="text-slate-500">MIT ’25</div>
+
+      {/* Bottom section (unchanged) */}
+      <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-slate-200">
+              <span className="text-xs font-semibold text-slate-600">
+                {authorName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .slice(0, 2)}
+              </span>
+            </div>
+            <div className="text-xs">
+              <div className="font-medium text-slate-900">{authorName}</div>
+              <div className="text-slate-500">{authorSchool}</div>
+            </div>
           </div>
         </div>
 
-        {/* Tags */}
         <div className="flex flex-wrap justify-end gap-2">
           <Tag>React</Tag>
           <Tag>TypeScript</Tag>
@@ -75,7 +103,12 @@ export default function FlexComponent() {
   );
 }
 
-function Tag({ children, variant = "solid" }) {
+type TagProps = {
+  children: React.ReactNode;
+  variant?: "solid" | "outline";
+};
+
+function Tag({ children, variant = "solid" }: TagProps) {
   const base =
     "inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium";
 
