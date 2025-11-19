@@ -1,3 +1,20 @@
+import { useEffect, useState } from "react";
+import { supabase } from "../supabase";
+
+interface Submission {
+  id: string;
+  first_name: string;
+  last_name: string;
+  school: string;
+  major: string;
+  graduation_year: string;
+  type_of_work: string[];   
+  relocating: string;      
+  skills: string[];         
+  side_projects: string;
+  flex: string;
+}
+
 interface Student {
   id: string;
   name: string;
@@ -11,71 +28,91 @@ interface Student {
   skills: string[];
 }
 
-// Sample data matching the image
-const sampleStudents: Student[] = [
-  {
-    id: "1",
-    name: "Alex Rivera",
-    university: "Carnegie Mellon",
-    major: "Computer Science",
-    bio: "Mobile developer with experience in both iOS and Android. Built apps with 100k+ downloads. Passionate about creating delightful user experiences and...",
-    location: "Pittsburgh, PA",
-    graduationYear: "2025",
-    employmentType: "Part-time (20 hrs/week)",
-    workPreference: "Remote",
-    skills: ["Swift", "Kotlin", "React Native", "Flutter", "Firebase", "UI/UX"],
-  },
-  {
-    id: "2",
-    name: "Emma Thompson",
-    university: "Georgia Tech",
-    major: "CS & Mathematics",
-    bio: "Security researcher and competitive programmer. Won several hackathons and CTF competitions. Interested in cryptography, blockchain, and building secure...",
-    location: "Atlanta, GA",
-    graduationYear: "2026",
-    employmentType: "Internship",
-    workPreference: "In-Person",
-    skills: [
-      "Java",
-      "Solidity",
-      "Assembly",
-      "Linux",
-      "Cryptography",
-      "Algorithms",
-    ],
-  },
-  {
-    id: "3",
-    name: "Jordan Lee",
-    university: "Cornell",
-    major: "Computer Science",
-    bio: "Backend engineer specializing in microservices architecture. Love working on performance optimization and building resilient systems. Former intern at Stripe and...",
-    location: "Ithaca, NY",
-    graduationYear: "2025",
-    employmentType: "Full Time",
-    workPreference: "Remote",
-    skills: ["Go", "Kubernetes", "PostgreSQL", "Redis", "gRPC", "Docker"],
-  },
-  {
-    id: "4",
-    name: "Marcus Johnson",
-    university: "Berkeley",
-    major: "CS & AI",
-    bio: "ML engineer with a focus on computer vision and NLP. Published research on transformer architectures. Interned at Google Brain and OpenAI. Looking to apply AI to solve real-...",
-    location: "San Francisco, CA",
-    graduationYear: "2025",
-    employmentType: "Full Time",
-    workPreference: "In-Person",
-    skills: ["Python", "TensorFlow", "PyTorch", "C++", "CUDA", "Docker"],
-  },
-];
+// this code is basically the translation between the submission data and the student data used in the component
+function mapSubmissionToStudent(sub: Submission): Student {
+  return {
+    id: sub.id,
+    name: `${sub.first_name} ${sub.last_name}`,
+    university: sub.school,
+    major: sub.major,
+    bio: sub.side_projects || sub.flex,
+    location: "Open to opportunities",
+    graduationYear: sub.graduation_year,
+    employmentType: sub.type_of_work.join(", "),
+    workPreference:
+      sub.relocating === "yes"
+        ? "Open to relocating"
+        : sub.relocating === "maybe"
+        ? "Maybe relocating"
+        : "Prefers not to relocate",
+    skills: sub.skills ?? [],
+  };
+}
 
 export default function BiosSection() {
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      setLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase
+        .from("submissions")
+        .select("*")
+        .order("id", { ascending: false }); // newest first (optional)
+
+      if (error) {
+        console.error("Error fetching submissions:", error);
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      const mapped =
+        (data as Submission[] | null)?.map(mapSubmissionToStudent) ?? [];
+      setStudents(mapped);
+      setLoading(false);
+    };
+
+    fetchStudents();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="w-full font-inter">
+        <p className="text-sm text-gray-500">Loading student profiles…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full font-inter">
+        <p className="text-sm text-red-600">
+          There was a problem loading student profiles: {error}
+        </p>
+      </div>
+    );
+  }
+
+  if (!students.length) {
+    return (
+      <div className="w-full font-inter">
+        <p className="text-sm text-gray-500">
+          No student profiles yet. Once someone submits the form, their profile
+          will show up here.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full font-inter">
-      {/* Student Profile Cards */}
       <div className="space-y-6">
-        {sampleStudents.map((student) => (
+        {students.map((student) => (
           <div
             key={student.id}
             className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
@@ -101,7 +138,8 @@ export default function BiosSection() {
                       {student.university} • {student.major}
                     </p>
                   </div>
-                  {/* Action Icons */}
+
+                  {/* Action Icons (unchanged) */}
                   <div className="flex items-center gap-3">
                     <button className="rounded-full p-1.5 hover:bg-slate-100">
                       <svg
@@ -142,6 +180,7 @@ export default function BiosSection() {
                 {/* Info Icons Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 mb-4 text-sm text-gray-600">
                   <div className="flex items-center gap-1.5">
+                    {/* location icon */}
                     <svg
                       className="w-4 h-4"
                       fill="none"
@@ -164,6 +203,7 @@ export default function BiosSection() {
                     <span className="text-black">{student.location}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
+                    {/* calendar icon */}
                     <svg
                       className="w-4 h-4"
                       fill="none"
@@ -182,6 +222,7 @@ export default function BiosSection() {
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
+                    {/* briefcase icon */}
                     <svg
                       className="w-4 h-4"
                       fill="none"
@@ -198,6 +239,7 @@ export default function BiosSection() {
                     <span className="text-black">{student.employmentType}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
+                    {/* globe icon */}
                     <svg
                       className="w-4 h-4"
                       fill="none"

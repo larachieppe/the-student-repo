@@ -31,7 +31,7 @@ export default function FormPage() {
     github: "",
     linkedin: "",
     typeOfWork: [],
-    relocating: "yes",
+    relocating: "",
     skills: [],
     sideProjects: "",
     flex: "",
