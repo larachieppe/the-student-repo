@@ -61,11 +61,14 @@ export default function BusinessPortal() {
   const [loadingFlex, setLoadingFlex] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
-  const [initialConversationId, setInitialConversationId] = useState<
-    string | null
-  >(null);
+  const [biosSubmissions, setBiosSubmissions] = useState<SubmissionRow[]>([]);
+  const [biosLoading, setBiosLoading] = useState(false);
+  const [initialConversationId, setInitialConversationId] = useState<string | null>(null);
 
   const [shortlist, setShortlist] = useState<StudentProfile[]>([]);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   const { user } = useAuth();
 
@@ -191,28 +194,56 @@ export default function BusinessPortal() {
     const loadHumbleFlex = async () => {
       setLoadingFlex(true);
       try {
-        let query = supabase
-          .from("submissions")
-          .select(
-            "id, first_name, last_name, school, graduation_year, flex, skills, email"
-          )
-          .not("flex", "is", null)
-          .neq("flex", "");
+        const term = searchTerm.trim();
+        let data: any[] | null = null;
+        let error: any = null;
 
-        if (sortOrder === "asc") {
-          query = query.order("last_name", { ascending: false });
+        if (term) {
+          const rpcResult = await supabase
+            .rpc('search_submissions_ci', { search_term: term })
+            .select(
+              "id, first_name, last_name, school, graduation_year, flex, skills, email"
+            );
+          
+          data = rpcResult.data as HumbleFlexSubmission[];
+          error = rpcResult.error;
         } else {
-          query = query.order("last_name", { ascending: true });
+          let query = supabase
+            .from("submissions")
+            .select(
+              "id, first_name, last_name, school, graduation_year, flex, skills, email"
+            )
+            .not("flex", "is", null)
+            .neq("flex", "");
+
+          if (sortOrder === "asc") {
+            query = query.order("last_name", { ascending: true });
+          } else {
+            query = query.order("last_name", { ascending: false });
+          }
+          
+          const defaultResult = await query;
+          data = defaultResult.data;
+          error = defaultResult.error;
         }
 
-        const { data, error } = await query;
 
         if (error) {
           console.error("Error loading humble flex submissions", error);
           return;
         }
 
-        setHumbleFlexSubmissions((data as HumbleFlexSubmission[]) || []);
+        let sortedData = (data as HumbleFlexSubmission[]) || [];
+
+        if (term) {
+             sortedData.sort((a, b) => {
+                const comparison = a.last_name.localeCompare(b.last_name);
+                return sortOrder === "asc" ? comparison : -comparison;
+            });
+        }
+
+
+        setHumbleFlexSubmissions(sortedData);
       } catch (err) {
         console.error("Unexpected error", err);
       } finally {
@@ -221,7 +252,9 @@ export default function BusinessPortal() {
     };
 
     loadHumbleFlex();
-  }, [activeSubtab, sortOrder]);
+  }, [activeSubtab, sortOrder, searchTerm]);
+
+  
 
   useEffect(() => {
     const loadProjects = async () => {
@@ -232,42 +265,43 @@ export default function BusinessPortal() {
 
       setProjectsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from("submissions")
-          .select(
-            "id, first_name, last_name, school, graduation_year, side_projects, skills, github"
-          )
-          .not("side_projects", "is", null)
-          .neq("side_projects", "");
+        const term = searchTerm.trim();
+        let query;
+
+        if (term) {
+          // Use RPC for search, then filter for non-null side_projects
+          query = supabase
+            .rpc('search_submissions_ci', { search_term: term })
+            .select(
+              "id, first_name, last_name, school, graduation_year, side_projects, skills, github"
+            )
+            .not("side_projects", "is", null)
+            .neq("side_projects", "");
+        } else {
+          // Default query if no search term
+          query = supabase
+            .from("submissions")
+            .select(
+              "id, first_name, last_name, school, graduation_year, side_projects, skills, github"
+            )
+            .not("side_projects", "is", null)
+            .neq("side_projects", "");
+        }
+        
+        const { data, error } = await query;
 
         if (error) {
           console.error("Error loading projects:", error);
-          console.error("Error details:", JSON.stringify(error, null, 2));
           setProjects([]);
           return;
         }
 
-        console.log("Raw data from Supabase:", data);
-        console.log("Number of submissions fetched:", data?.length || 0);
-
-        if (!data || data.length === 0) {
-          console.log("No submissions found with side_projects");
+        if (!Array.isArray(data) || data.length === 0) {
           setProjects([]);
           return;
-        }
-
-        // Log first submission for debugging
-        if (data.length > 0) {
-          console.log("Sample submission:", {
-            id: data[0].id,
-            name: `${data[0].first_name} ${data[0].last_name}`,
-            side_projects: data[0].side_projects,
-            skills: data[0].skills,
-          });
         }
 
         const parsed = parseProjects(data as SubmissionRow[]);
-        console.log("Parsed projects:", parsed);
 
         // Sort projects
         const sorted = [...parsed].sort((a, b) => {
@@ -288,7 +322,55 @@ export default function BusinessPortal() {
     };
 
     loadProjects();
-  }, [activeSubtab, sortOrder]);
+  }, [activeSubtab, sortOrder, searchTerm]); 
+
+
+  useEffect(() => {
+    if (activeSubtab !== "bios") return;
+
+    const loadBios = async () => {
+      setBiosLoading(true); 
+      try {
+        const term = searchTerm.trim();
+        let query;
+
+        const selectColumns = "id, first_name, last_name, school, major, graduation_year, side_projects, skills, github, linkedin, type_of_work, relocating, flex";
+        if (term) {
+          // Use RPC for search
+          query = supabase
+            .rpc('search_submissions_ci', { search_term: term })
+            .select(selectColumns);
+        } else {
+          // Default query
+          query = supabase
+            .from("submissions")
+            .select(selectColumns);
+        }
+        
+        // Apply sorting based on state
+        if (sortOrder === "asc") {
+          query = query.order("last_name", { ascending: true });
+        } else {
+          query = query.order("last_name", { ascending: false });
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error("Error loading bios", error);
+          setBiosSubmissions([]);
+          return;
+        }
+
+        setBiosSubmissions(data as SubmissionRow[] ?? []);      } catch (err) {
+        console.error("Unexpected error loading bios", err);
+      } finally {
+        setBiosLoading(false); 
+      }
+    };
+
+    loadBios(); 
+  }, [activeSubtab, sortOrder, searchTerm]);
 
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans">
@@ -314,7 +396,10 @@ export default function BusinessPortal() {
                     setActive={setActiveSubtab}
                   />
                 </div>
-                <button className="flex items-center gap-2 rounded-full border border-brand-blue px-4 py-2 font-medium text-black hover:bg-brand-blue/5 transition">
+                <button
+                  className="flex items-center gap-2 rounded-full border border-brand-blue px-4 py-2 font-medium text-black hover:bg-brand-blue/5 transition"
+                  onClick={() => setIsSearchVisible(prev => !prev)}
+                >
                   <svg
                     className="w-4 h-4"
                     fill="none"
@@ -328,9 +413,36 @@ export default function BusinessPortal() {
                       d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
                     />
                   </svg>
-                  Filters
+                  Search
                 </button>
               </div>
+              
+              {isSearchVisible && (
+                <div className="mt-4 flex justify-end">
+                  <div className="relative w-full max-w-md">
+                    <input
+                      type="text"
+                      placeholder="Search name, school, or skill..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full px-4 py-2 text-sm rounded-lg border border-gray-300 focus:ring-brand-blue focus:border-brand-blue transition"
+                    />
+                    <svg
+                      className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 transform -translate-y-1/2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between mt-4">
                 <div className="text-gray-400">
                   {activeSubtab === "projects"
@@ -449,7 +561,7 @@ export default function BusinessPortal() {
                   )}
                 </div>
               )}
-              {activeSubtab === "bios" && <BiosSection />}
+              {activeSubtab === "bios" && <BiosSection searchTerm={searchTerm} onStartConversation={handleStartConversation} />}
             </>
           )}
 

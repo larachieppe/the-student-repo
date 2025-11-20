@@ -49,7 +49,12 @@ function mapSubmissionToStudent(sub: Submission): Student {
   };
 }
 
-export default function BiosSection() {
+interface BiosSectionProps {
+  searchTerm: string;
+  onStartConversation: (studentId: string) => void;
+}
+
+export default function BiosSection({searchTerm, onStartConversation}: BiosSectionProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,10 +64,23 @@ export default function BiosSection() {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from("submissions")
-        .select("*")
-        .order("id", { ascending: false }); // newest first (optional)
+      const term = searchTerm.trim();
+      let query;
+
+      if (term) {
+        // Use RPC for search if a term is present
+        query = supabase
+          .rpc('search_submissions_ci', { search_term: term })
+          .select("*");
+      } else {
+        // Default query if no search term
+        query = supabase
+          .from("submissions")
+          .select("*")
+          .order("id", { ascending: false }); // newest first (optional)
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching submissions:", error);
@@ -78,7 +96,7 @@ export default function BiosSection() {
     };
 
     fetchStudents();
-  }, []);
+  }, [searchTerm]);
 
   if (loading) {
     return (
@@ -141,7 +159,7 @@ export default function BiosSection() {
 
                   {/* Action Icons (unchanged) */}
                   <div className="flex items-center gap-3">
-                    <button className="rounded-full p-1.5 hover:bg-slate-100">
+                    <button className="rounded-full p-1.5 hover:bg-slate-100" onClick={() => onStartConversation(student.id)}>
                       <svg
                         width="18"
                         height="18"
