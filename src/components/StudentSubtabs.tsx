@@ -16,14 +16,14 @@ export default function StudentsSubtabs({
   ] as const;
 
   return (
-    <div className="inline-flex gap-2 rounded-full border border-gray-200 bg-white">
+    <div className="inline-flex gap-2 rounded-xl border border-gray-200 bg-white">
       {subtabs.map((tab) => {
         const isActive = active === tab.key;
         return (
           <button
             key={tab.key}
             onClick={() => setActive(tab.key)}
-            className={`px-4 py-1.5 rounded-full text-sm transition
+            className={`px-4 py-1.5 rounded-xl text-sm transition
                 ${
                   isActive
                     ? "bg-brand-blue text-white shadow-sm"
