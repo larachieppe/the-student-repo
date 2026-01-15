@@ -7,22 +7,35 @@ export default function AuthCallback() {
 
   useEffect(() => {
     (async () => {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(
+          window.location.href
+        );
+        if (error) {
+          console.error("[exchangeCodeForSession error]", error);
+          navigate("/login", { replace: true });
+          return;
+        }
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      //Try to get role from metadata or from localStorage
-      let role =
+      const role =
         user?.user_metadata?.role ||
         localStorage.getItem("loginRole") ||
         "student";
 
-      //Persist role into Supabase user_metadata if it wasn’t already stored
-      if (role && user && user.user_metadata?.role !== role) {
+      if (user && user.user_metadata?.role !== role) {
         await supabase.auth.updateUser({ data: { role } });
       }
 
-      //Redirect user to correct portal
+      localStorage.removeItem("loginRole");
+
       if (role === "student") navigate("/student-portal", { replace: true });
       else if (role === "business")
         navigate("/business-portal", { replace: true });

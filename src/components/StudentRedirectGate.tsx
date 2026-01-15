@@ -1,25 +1,35 @@
 // StudentRedirectGate.tsx
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
 
 export default function StudentRedirectGate() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
+    // Only run this gate ON the portal entry route
+    if (location.pathname !== "/student-portal") return;
+
+    // Wait until auth is settled
+    if (loading) return;
+
+    // If logged out, do nothing (RequireAuth will redirect)
     if (!user) return;
 
+    let cancelled = false;
+
     const run = async () => {
-      // If we stored an id from LoginPage, use it
+      // 1) If we stored an id from LoginPage, use it (only while logged in)
       const storedId = localStorage.getItem("studentSubmissionId");
-      if (storedId) {
-        navigate(`/student/${storedId}`);
+      if (storedId && !cancelled) {
+        navigate(`/student/${storedId}`, { replace: true });
         return;
       }
 
-      // Fallback: look up by email
+      // 2) Fallback: look up by email
       const email = user.email?.toLowerCase();
       if (!email) return;
 
@@ -29,21 +39,27 @@ export default function StudentRedirectGate() {
         .eq("email", email)
         .maybeSingle();
 
+      if (cancelled) return;
+
       if (error) {
         console.error(error);
         return;
       }
 
-      if (data) {
-        navigate(`/student/${data.id}`);
+      if (data?.id) {
+        navigate(`/student/${data.id}`, { replace: true });
       } else {
-        // No profile found → maybe send to form page
-        navigate("/student-form");
+        navigate("/student-form", { replace: true });
       }
     };
 
     run();
-  }, [user, navigate]);
 
-  return null; // just a redirect gate, no UI needed
+    // Prevent navigation after logout / unmount
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loading, navigate, location.pathname]);
+
+  return null;
 }

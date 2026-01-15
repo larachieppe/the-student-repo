@@ -1,8 +1,30 @@
 import { useState } from "react";
-import NavBar from "../components/NavBar";
-import Footer from "../components/Footer";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase";
+
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+const ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/vnd.rar",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
+  "image/png",
+  "image/jpeg",
+]);
+
+const ALLOWED_EXTENSIONS = new Set([
+  "pdf",
+  "zip",
+  "rar",
+  "7z",
+  "png",
+  "jpg",
+  "jpeg",
+]);
 
 type FormState = {
   firstName: string;
@@ -18,6 +40,7 @@ type FormState = {
   skills: string[];
   sideProjects: string;
   flex: string;
+  sideProjectLink: string;
 };
 
 export default function FormPage() {
@@ -35,6 +58,7 @@ export default function FormPage() {
     skills: [],
     sideProjects: "",
     flex: "",
+    sideProjectLink: "",
   });
   const [skillsList, setSkillsList] = useState([
     "Python",
@@ -81,15 +105,95 @@ export default function FormPage() {
     }
   };
 
+  const sanitizeFilename = (name: string) =>
+    name
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9._-]/g, "");
+
+  const uploadAttachments = async (email: string, filesToUpload: File[]) => {
+    const timestamp = Date.now();
+    const basePath = `submissions/${email.toLowerCase()}/${timestamp}`;
+
+    const uploadedUrls: string[] = [];
+    const uploadedNames: string[] = [];
+
+    for (const file of filesToUpload) {
+      const safeName = sanitizeFilename(file.name);
+      const path = `${basePath}/${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("student-attachments")
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || undefined,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("student-attachments")
+        .getPublicUrl(path);
+
+      if (!data?.publicUrl) {
+        throw new Error("Failed to generate public URL for uploaded file.");
+      }
+
+      uploadedUrls.push(data.publicUrl);
+      uploadedNames.push(file.name);
+    }
+
+    return { uploadedUrls, uploadedNames };
+  };
+
   const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
     if (!selected.length) return;
+
+    const valid: File[] = [];
+    const rejected: string[] = [];
+
+    for (const f of selected) {
+      const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
+
+      const typeOk =
+        (f.type && ALLOWED_MIME_TYPES.has(f.type)) ||
+        ALLOWED_EXTENSIONS.has(ext);
+
+      const sizeOk = f.size <= MAX_FILE_SIZE_BYTES;
+
+      if (!typeOk) {
+        rejected.push(`${f.name} (unsupported type)`);
+        continue;
+      }
+      if (!sizeOk) {
+        rejected.push(`${f.name} (over ${MAX_FILE_SIZE_MB}MB)`);
+        continue;
+      }
+      valid.push(f);
+    }
+
+    if (rejected.length) {
+      alert(
+        `Some files were not added:\n\n${rejected.join(
+          "\n"
+        )}\n\nAllowed: PDF, ZIP/RAR/7Z, PNG/JPG up to ${MAX_FILE_SIZE_MB}MB.`
+      );
+    }
+
+    if (!valid.length) {
+      e.target.value = "";
+      return;
+    }
+
     setFiles((prev) => {
       const key = (f: File) => `${f.name}-${f.size}-${f.lastModified}`;
       const existingKeys = new Set(prev.map(key));
-      const additions = selected.filter((f) => !existingKeys.has(key(f)));
+      const additions = valid.filter((f) => !existingKeys.has(key(f)));
       return [...prev, ...additions];
     });
+
     e.target.value = "";
   };
 
@@ -100,35 +204,108 @@ export default function FormPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const { error } = await supabase.from("submissions").upsert({
-      first_name: form.firstName,
-      last_name: form.lastName,
-      email: form.email,
-      school: form.school,
-      graduation_year: form.graduationYear,
-      major: form.major,
-      github: form.github,
-      linkedin: form.linkedin,
-      type_of_work: form.typeOfWork,
-      relocating: form.relocating,
-      skills: form.skills,
-      side_projects: form.sideProjects,
-      flex: form.flex,
-    });
+    const requiredTextFields: Array<keyof FormState> = [
+      "firstName",
+      "lastName",
+      "email",
+      "school",
+      "graduationYear",
+      "major",
+      "github",
+      "linkedin",
+      "sideProjects",
+      "flex",
+      "sideProjectLink",
+    ];
 
-    if (error) {
-      console.error("Supabase insert error:", error);
-      alert(error.message);
+    const fieldLabels: Record<keyof FormState, string> = {
+      firstName: "First Name",
+      lastName: "Last Name",
+      email: "Email",
+      school: "School",
+      graduationYear: "Graduation Year",
+      major: "Major",
+      github: "GitHub",
+      linkedin: "LinkedIn",
+      typeOfWork: "Type of Work",
+      relocating: "Open to relocating?",
+      skills: "Skills",
+      sideProjects: "Side projects",
+      flex: "Humble flex",
+      sideProjectLink: "Side project link",
+    };
+
+    for (const key of requiredTextFields) {
+      const value = String(form[key] ?? "").trim();
+      if (!value) {
+        alert(
+          `Please complete the following field: ${
+            fieldLabels[key] ?? String(key)
+          }`
+        );
+
+        return;
+      }
+    }
+
+    if (form.typeOfWork.length === 0) {
+      alert("Please select at least one Type of Work.");
       return;
     }
 
-    navigate("/submitted");
+    if (form.skills.length === 0) {
+      alert("Please select at least one Skill.");
+      return;
+    }
+
+    if (!form.relocating.trim()) {
+      alert("Please answer: Open to relocating?");
+      return;
+    }
+
+    if (!form.email.trim()) {
+      alert("Please enter your email before uploading attachments.");
+      return;
+    }
+
+    try {
+      // 1) Upload to Storage
+      const { uploadedUrls } = await uploadAttachments(form.email, files);
+
+      // 2) Save submission row including attachment URLs
+      const { error } = await supabase.from("submissions").upsert({
+        first_name: form.firstName,
+        last_name: form.lastName,
+        email: form.email,
+        school: form.school,
+        graduation_year: form.graduationYear,
+        major: form.major,
+        github: form.github,
+        linkedin: form.linkedin,
+        type_of_work: form.typeOfWork,
+        relocating: form.relocating,
+        skills: form.skills,
+        side_projects: form.sideProjects,
+        flex: form.flex,
+        side_project_link: form.sideProjectLink,
+        attachment_urls: uploadedUrls,
+      });
+
+      if (error) {
+        console.error("Supabase insert error:", error);
+        alert(error.message);
+        return;
+      }
+
+      navigate("/submitted");
+    } catch (err: any) {
+      console.error("Submit failed:", err);
+      alert(err?.message ?? "Upload failed. Please try again.");
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-white font-mono">
-      {/* Custom White Header */}
-      <NavBar />
       {/* Blue Hero Section */}
       <section className="w-full bg-brand-blue text-white text-center py-8 px-2 border-b border-brand-blue">
         <h1 className="font-bold text-3xl md:text-4xl tracking-tight mb-4">
@@ -508,11 +685,35 @@ export default function FormPage() {
               rows={3}
             />
           </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-s font-semibold">
+              Please attach the side project you’ve worked on that you’re most
+              proud of.
+              <span
+                style={{
+                  fontSize: "0.7em",
+                  verticalAlign: "super",
+                  color: "blue",
+                  marginLeft: "0.2px",
+                }}
+              >
+                *
+              </span>
+            </label>
+            <input
+              type="url"
+              name="sideProjectLink"
+              value={form.sideProjectLink}
+              onChange={handleChange}
+              placeholder="https://github.com/username/project"
+              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-mono bg-gray-100 focus:outline-none focus:ring-1 focus:ring-brand-blue"
+            />
+          </div>
 
           {/* Attachments */}
           <div>
             <label className="text-s font-semibold">
-              Please attack any additional information you would like us to
+              Please attach any additional information you would like us to
               consider
             </label>
             <div className="mt-2">
@@ -564,7 +765,6 @@ export default function FormPage() {
           </button>
         </form>
       </div>
-      <Footer />
     </div>
   );
 }

@@ -1,4 +1,3 @@
-// NavBar.tsx
 import logo from "../assets/logo.png";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../useAuth";
@@ -120,9 +119,26 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
           ) : (
             <>
               <button
-                onClick={() => {
-                  signOut();
-                  scrollToTop();
+                onClick={async () => {
+                  console.log("[LOGOUT] clicked", {
+                    href: window.location.href,
+                    hash: window.location.hash,
+                  });
+
+                  try {
+                    // 1) call your app signOut
+                    await signOut();
+                    console.log("[LOGOUT] signOut() resolved");
+                  } catch (e) {
+                    console.error("[LOGOUT] signOut() threw", e);
+                  } finally {
+                    // 2) regardless of what happened, force home + hard reload
+                    const target = `${import.meta.env.BASE_URL}#/`;
+                    console.log("[LOGOUT] forcing redirect to", target);
+
+                    window.location.assign(target);
+                    window.location.reload();
+                  }
                 }}
                 className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-brand-text hover:border md:inline-flex min-w-[80px]"
               >

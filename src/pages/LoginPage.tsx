@@ -1,6 +1,4 @@
 import { useState } from "react";
-import googleImage from "../assets/loginGoogle.png";
-import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 import { useAuth } from "../useAuth";
 
@@ -8,7 +6,7 @@ type Role = "student" | "business" | "admin"; // ➕ NEW
 
 export default function LoginPage() {
   const [role, setRole] = useState<Role>("student");
-  const { signInWithEmail, signInWithProvider } = useAuth();
+  const { signInWithEmail } = useAuth();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -38,21 +36,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogle = async () => {
-    setErr(null);
-    setLoading("google");
-    try {
-      // keep the chosen role so we can stamp it after OAuth returns
-      localStorage.setItem("loginRole", role);
-
-      const { error } = await signInWithProvider("google");
-      if (error) setErr(error.message);
-      // no success state here — OAuth redirects away
-    } finally {
-      setLoading(null);
-    }
-  };
-
   const roles = [
     {
       name: "student" as const,
@@ -70,9 +53,8 @@ export default function LoginPage() {
 
   return (
     <div className="bg-white">
-      <NavBar />
       <div className="flex items-center justify-center min-h-screen">
-        <div className="bg-white p-10 rounded-2xl shadow-xl w-[500px] text-center">
+        <div className="p-10 rounded-2xl shadow-xl w-[500px] text-center bg-white border-brand-blue border-2">
           {/* Title */}
           <h1 className="font-mono font-semibold text-[30px] leading-none text-[#1e2015] tracking-[-1.2px]">
             LOGIN TO YOUR ACCOUNT
@@ -121,31 +103,6 @@ export default function LoginPage() {
               </div>
             ) : (
               <>
-                {/* Google Sign-in */}
-                <button
-                  type="button"
-                  onClick={handleGoogle}
-                  disabled={loading === "google"}
-                  className="w-full flex items-center justify-center gap-2 border rounded-lg py-2 mb-4 bg-brand-blue text-white hover:brightness-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <img
-                    src={googleImage}
-                    alt="Google icon"
-                    className="w-5 h-5"
-                  />
-                  <span>
-                    {loading === "google"
-                      ? "Continuing..."
-                      : "Continue with Google"}
-                  </span>
-                </button>
-
-                <div className="flex items-center mb-4">
-                  <hr className="flex-1 border-gray-300" />
-                  <span className="text-gray-400 text-sm px-2">OR</span>
-                  <hr className="flex-1 border-gray-300" />
-                </div>
-
                 {/* Email form */}
                 <form onSubmit={handleEmail}>
                   {" "}

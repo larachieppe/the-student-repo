@@ -1,7 +1,6 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useRef, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
-import { useNavigate } from "react-router-dom";
 
 export type AuthContextType = {
   user: User | null;
@@ -22,37 +21,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const signOutResolverRef = useRef<null | (() => void)>(null);
 
   // Load current session once on mount
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
+      console.log("[AUTH] getSession user:", data.session?.user?.id ?? null);
       setSession(data.session ?? null);
       setUser(data.session?.user ?? null);
       setLoading(false);
-
-      const role = data.session?.user?.user_metadata?.role;
-      if (role) {
-        const currentPath = window.location.pathname;
-        if (
-          currentPath === "/" ||
-          currentPath === "/login" ||
-          currentPath === "/auth/callback"
-        ) {
-          if (role === "student") navigate("/student-portal");
-          else if (role === "business") navigate("/business-portal");
-          else if (role === "admin") navigate("/admin-portal");
-        }
-      }
     });
 
-    //Keep session in sync; no redirects here
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, sess) => {
+    } = supabase.auth.onAuthStateChange((event, sess) => {
+      console.log(
+        "[AUTH] event:",
+        event,
+        "user:",
+        sess?.user?.id ?? null,
+        "hash:",
+        window.location.hash
+      );
       setSession(sess);
       setUser(sess?.user ?? null);
       setLoading(false);
+
+      if (event === "SIGNED_OUT") {
+        // resolve any pending signOut waits
+        if (signOutResolverRef.current) {
+          signOutResolverRef.current();
+          signOutResolverRef.current = null;
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -64,7 +65,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       options: {
         data: { role },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}${
+          import.meta.env.BASE_URL
+        }#/auth/callback`,
       },
     });
 
@@ -78,13 +81,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithProvider = async (provider: "google" | "github") => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` }, // 🔧 changed
+      options: {
+        redirectTo: `${window.location.origin}${
+          import.meta.env.BASE_URL
+        }#/auth/callback`,
+      },
     });
     return { error };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem("loginRole");
+    localStorage.removeItem("studentSubmissionId");
+
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+
+    // Immediately update app state
+    setSession(null);
+    setUser(null);
   };
 
   return (
