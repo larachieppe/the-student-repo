@@ -7,6 +7,7 @@ export type AuthContextType = {
   session: Session | null;
   loading: boolean;
   signInWithEmail: (email: string, role?: string) => Promise<{ error: any }>;
+  verifyOtp: (email: string, token: string) => Promise<{ error: any; session: Session | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -61,19 +62,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Send magic link; attach role & send user back to /auth/callback
+  // Send 6-digit OTP code to email (no magic link)
   const signInWithEmail = async (email: string) => {
-    const basePath = window.location.pathname.endsWith("/")
-      ? window.location.pathname
-      : window.location.pathname + "/";
-
-    const redirectTo = `${window.location.origin}${basePath}#/auth/callback`;
-    console.log("[OTP redirectTo]", redirectTo);
-
     try {
       const res = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: redirectTo },
+        options: {
+          shouldCreateUser: true,
+        },
       });
 
       if (res.error) {
@@ -86,6 +82,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("[OTP] signInWithOtp threw:", e);
       return { error: e };
+    }
+  };
+
+  // Verify 6-digit OTP code
+  const verifyOtp = async (email: string, token: string) => {
+    try {
+      const res = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: "email",
+      });
+
+      if (res.error) {
+        console.error("[OTP] verifyOtp error:", res.error);
+        return { error: res.error, session: null };
+      } else {
+        console.log("[OTP] verifyOtp ok:", res.data);
+        setSession(res.data.session);
+        setUser(res.data.user);
+        return { error: null, session: res.data.session };
+      }
+    } catch (e) {
+      console.error("[OTP] verifyOtp threw:", e);
+      return { error: e, session: null };
     }
   };
 
@@ -108,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         loading,
         signInWithEmail,
+        verifyOtp,
         signOut,
       }}
     >
