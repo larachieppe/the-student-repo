@@ -8,14 +8,12 @@ import AuthCallback from "./AuthCallback";
 import BusinessPortal from "./pages/BusinessPortal";
 import RCPortal from "./pages/RCPortal";
 import RequireAuth from "./components/RequireAuth";
-import StudentRedirectGate from "./components/StudentRedirectGate";
 import PortalLayout from "./components/PortalLayout";
-import LogoutRedirector from "./components/LogoutRedirector";
+import StudentPortal from "./pages/StudentPortal";
 
 export default function App() {
   return (
     <>
-      <LogoutRedirector />
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
@@ -31,7 +29,7 @@ export default function App() {
             path="/student-portal"
             element={
               <RequireAuth>
-                <StudentRedirectGate />
+                <StudentPortal />
               </RequireAuth>
             }
           />

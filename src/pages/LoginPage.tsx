@@ -23,11 +23,15 @@ export default function LoginPage() {
       // 🔍 Debug: see exactly what goes to Supabase
       console.log("[Login] cleanEmail =", JSON.stringify(cleanEmail));
 
-      localStorage.setItem("loginRole", role);
       const { error } = await signInWithEmail(cleanEmail, role);
       if (error) {
         console.error("[Supabase signInWithEmail error]", error);
-        setErr(error.message);
+        setErr(
+          (error as any)?.message ??
+            (error as any)?.error_description ??
+            (error as any)?.error ??
+            JSON.stringify(error)
+        );
       } else {
         setSent(true);
       }
@@ -90,8 +94,8 @@ export default function LoginPage() {
             {sent ? (
               <div className="space-y-3">
                 <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-                  Magic link sent to <b>{email}</b>. Check your inbox to finish
-                  signing in.
+                  Verification link sent to <b>{email}</b>. Check your inbox to
+                  finish signing in.
                 </div>
                 <button
                   type="button"

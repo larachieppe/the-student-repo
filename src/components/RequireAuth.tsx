@@ -3,7 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../useAuth";
 
 export default function RequireAuth(props: { children: React.ReactElement }) {
-  const { user, loading } = useAuth();
+  const { session, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -12,8 +12,8 @@ export default function RequireAuth(props: { children: React.ReactElement }) {
     );
   }
 
-  if (!user) {
-    return <Navigate to="/" replace state={{ from: location.pathname }} />;
+  if (!session) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
   return props.children;

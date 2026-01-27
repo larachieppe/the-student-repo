@@ -2,32 +2,32 @@ import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../useAuth";
 
-const PUBLIC_PATHS = new Set([
-  "/",
-  "/login",
-  "/form",
-  "/submitted",
-  "/auth/callback",
-]);
+const PROTECTED_PREFIXES = [
+  "/student-portal",
+  "/business-portal",
+  "/admin-portal",
+];
 
 export default function LogoutRedirector() {
-  const { user, loading } = useAuth();
+  const { session, loading } = useAuth(); // ✅ CHANGED: session not user
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (loading) return;
 
-    // If logged out and currently on a non-public route, force home.
-    if (!user && !PUBLIC_PATHS.has(location.pathname)) {
-      navigate("/", { replace: true });
+    // ✅ never touch callback
+    if (location.pathname === "/auth/callback") return;
 
-      // HashRouter sometimes keeps stale hash; force it too.
-      if (window.location.hash !== "#/") {
-        window.location.hash = "#/";
-      }
+    const isProtected = PROTECTED_PREFIXES.some((p) =>
+      location.pathname.startsWith(p)
+    );
+
+    // ✅ CHANGED: redirect to /login (not /) and only for protected routes
+    if (isProtected && !session) {
+      navigate("/login", { replace: true });
     }
-  }, [user, loading, location.pathname, navigate]);
+  }, [session, loading, location.pathname, navigate]);
 
   return null;
 }

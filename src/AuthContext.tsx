@@ -1,4 +1,4 @@
-import { createContext, useEffect, useRef, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
@@ -7,9 +7,6 @@ export type AuthContextType = {
   session: Session | null;
   loading: boolean;
   signInWithEmail: (email: string, role?: string) => Promise<{ error: any }>;
-  signInWithProvider: (
-    provider: "google" | "github"
-  ) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 };
 
@@ -21,73 +18,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const signOutResolverRef = useRef<null | (() => void)>(null);
 
   // Load current session once on mount
   useEffect(() => {
+    const isAuthCallback = window.location.hash.includes("#/auth/callback");
+
+    let timeoutId: number | undefined;
+    if (isAuthCallback) {
+      timeoutId = window.setTimeout(() => setLoading(false), 3000);
+    }
+
     supabase.auth.getSession().then(({ data }) => {
-      console.log("[AUTH] getSession user:", data.session?.user?.id ?? null);
       setSession(data.session ?? null);
       setUser(data.session?.user ?? null);
+
+      if (isAuthCallback && !data.session) return;
+
       setLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, sess) => {
-      console.log(
-        "[AUTH] event:",
-        event,
-        "user:",
-        sess?.user?.id ?? null,
-        "hash:",
-        window.location.hash
-      );
+    } = supabase.auth.onAuthStateChange(async (event, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
-      setLoading(false);
 
-      if (event === "SIGNED_OUT") {
-        // resolve any pending signOut waits
-        if (signOutResolverRef.current) {
-          signOutResolverRef.current();
-          signOutResolverRef.current = null;
-        }
+      if (
+        event === "INITIAL_SESSION" ||
+        event === "SIGNED_IN" ||
+        event === "SIGNED_OUT" ||
+        event === "USER_UPDATED"
+      ) {
+        setLoading(false);
       }
+
+      // keep your upsert if you want
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Send magic link; attach role & send user back to /auth/callback
-  const signInWithEmail = async (email: string, role?: string) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        data: { role },
-        emailRedirectTo: `${window.location.origin}${
-          import.meta.env.BASE_URL
-        }#/auth/callback`,
-      },
-    });
+  const signInWithEmail = async (email: string) => {
+    const basePath = window.location.pathname.endsWith("/")
+      ? window.location.pathname
+      : window.location.pathname + "/";
 
-    if (error) {
-      console.error("Supabase signInWithOtp error:", error);
+    const redirectTo = `${window.location.origin}${basePath}#/auth/callback`;
+    console.log("[OTP redirectTo]", redirectTo);
+
+    try {
+      const res = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: redirectTo },
+      });
+
+      if (res.error) {
+        console.error("[OTP] signInWithOtp error:", res.error);
+      } else {
+        console.log("[OTP] signInWithOtp ok:", res.data);
+      }
+
+      return { error: res.error };
+    } catch (e) {
+      console.error("[OTP] signInWithOtp threw:", e);
+      return { error: e };
     }
-    return { error };
-  };
-
-  // OAuth → also return to /auth/callback for unified handling
-  const signInWithProvider = async (provider: "google" | "github") => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}${
-          import.meta.env.BASE_URL
-        }#/auth/callback`,
-      },
-    });
-    return { error };
   };
 
   const signOut = async () => {
@@ -109,7 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         loading,
         signInWithEmail,
-        signInWithProvider,
         signOut,
       }}
     >
