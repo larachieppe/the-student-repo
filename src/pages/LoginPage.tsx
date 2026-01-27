@@ -23,7 +23,14 @@ export default function LoginPage() {
       const cleanEmail = email.trim().toLowerCase();
       console.log("[Login] cleanEmail =", JSON.stringify(cleanEmail));
 
-      const { error } = await signInWithEmail(cleanEmail, role);
+      const { error, redirectTo } = await signInWithEmail(cleanEmail, role);
+      
+      // Handle redirect case (e.g., student not found -> redirect to form)
+      if (redirectTo) {
+        navigate(redirectTo, { replace: true });
+        return;
+      }
+
       if (error) {
         console.error("[Supabase signInWithEmail error]", error);
         setErr(

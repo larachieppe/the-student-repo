@@ -112,6 +112,11 @@ export default function FormPage() {
       .replace(/[^a-zA-Z0-9._-]/g, "");
 
   const uploadAttachments = async (email: string, filesToUpload: File[]) => {
+    // Skip upload if no files
+    if (!filesToUpload || filesToUpload.length === 0) {
+      return { uploadedUrls: [], uploadedNames: [] };
+    }
+
     const timestamp = Date.now();
     const basePath = `submissions/${email.toLowerCase()}/${timestamp}`;
 
@@ -130,7 +135,15 @@ export default function FormPage() {
           contentType: file.type || undefined,
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        // Provide more helpful error messages
+        if (uploadError.message?.includes("Bucket not found") || uploadError.message?.includes("not found")) {
+          throw new Error(
+            "Storage bucket 'student-attachments' not found. Please create it in your Supabase Storage settings."
+          );
+        }
+        throw uploadError;
+      }
 
       const { data } = supabase.storage
         .from("student-attachments")
