@@ -5,7 +5,7 @@ export default function PortalLayout() {
   return (
     <div className="bg-white min-h-screen flex flex-col">
       <div className="flex-1">
-        <Outlet />
+        <Outlet context={{ activeTab, setActiveTab }} />
       </div>
       <Footer />
     </div>

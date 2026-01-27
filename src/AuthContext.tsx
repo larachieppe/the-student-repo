@@ -92,12 +92,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Try to sign in - if user doesn't exist, Supabase will create them
         // But we need to verify the role matches
         const { data: existingUser } = await supabase
-          .from("users")
+          .from("accounts")
           .select("role, email")
           .eq("email", cleanEmail)
           .maybeSingle();
 
-        // If user exists in users table, check role
+        // If user exists in accounts table, check role
         if (existingUser && existingUser.role !== "student") {
           return {
             error: {
@@ -121,16 +121,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         console.log("[OTP] signInWithOtp ok:", res.data);
         return { error: null };
-      } else if (role === "business" || role === "admin") {
-        // For business/admin: check if email exists in users table with correct role
+      } else if (role === "business") {
+        // For business: check if email domain matches a company
+        const emailDomain = cleanEmail.split("@")[1];
+        
+        if (!emailDomain) {
+          return {
+            error: {
+              message: "Invalid email address format.",
+            },
+          };
+        }
+
+        // Check if domain exists in companies table
+        const { data: company, error: companyError } = await supabase
+          .from("companies")
+          .select("id, name, email_domain")
+          .eq("email_domain", emailDomain)
+          .maybeSingle();
+
+        if (companyError) {
+          console.error("[Login] Error checking companies:", companyError);
+          return { error: { message: "Error checking company records. Please try again." } };
+        }
+
+        // If domain doesn't match any company
+        if (!company) {
+          return {
+            error: {
+              message: "Your email domain is not associated with any partner company. Please contact support if you believe this is an error.",
+            },
+          };
+        }
+
+        // Domain matches a company, check if user already exists
+        const { data: existingUser } = await supabase
+          .from("accounts")
+          .select("id, email, role, company_id")
+          .eq("email", cleanEmail)
+          .maybeSingle();
+
+        // If user exists, check role
+        if (existingUser) {
+          if (existingUser.role !== "business") {
+            return {
+              error: {
+                message: "You are logging in with the wrong button. Please select the correct role.",
+              },
+            };
+          }
+          // User exists and role is correct, update company_id if needed
+          if (existingUser.company_id !== company.id) {
+            await supabase
+              .from("accounts")
+              .update({ company_id: company.id })
+              .eq("id", existingUser.id);
+          }
+        }
+
+        // Send OTP - allow user creation if they don't exist yet
+        const res = await supabase.auth.signInWithOtp({
+          email: cleanEmail,
+          options: {
+            shouldCreateUser: true,
+            data: {
+              role: "business",
+              company_id: company.id,
+              company_name: company.name,
+            },
+          },
+        });
+
+        if (res.error) {
+          console.error("[OTP] signInWithOtp error:", res.error);
+          return { error: res.error };
+        }
+
+        // User record will be created in users table after OTP verification
+
+        console.log("[OTP] signInWithOtp ok:", res.data);
+        return { error: null };
+      } else if (role === "admin") {
+        // For admin: check if email exists in accounts table with admin role
         const { data: user, error: userError } = await supabase
-          .from("users")
+          .from("accounts")
           .select("email, role")
           .eq("email", cleanEmail)
           .maybeSingle();
 
         if (userError) {
-          console.error("[Login] Error checking users:", userError);
+          console.error("[Login] Error checking accounts:", userError);
           return { error: { message: "Error checking user records. Please try again." } };
         }
 
@@ -138,13 +218,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!user) {
           return {
             error: {
-              message: `No ${role} account found with this email. Please contact support.`,
+              message: "No admin account found with this email. Please contact support.",
             },
           };
         }
 
         // Check if role matches
-        if (user.role !== role) {
+        if (user.role !== "admin") {
           return {
             error: {
               message: "You are logging in with the wrong button. Please select the correct role.",
@@ -156,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await supabase.auth.signInWithOtp({
           email: cleanEmail,
           options: {
-            shouldCreateUser: false, // Don't create new users for business/admin
+            shouldCreateUser: false, // Don't create new users for admin
           },
         });
 
@@ -214,6 +294,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("[OTP] verifyOtp ok:", res.data);
         setSession(res.data.session);
         setUser(res.data.user);
+
+        // Create or update user record in accounts table if needed
+        if (res.data.user) {
+          const userMetadata = res.data.user.user_metadata || {};
+          const role = userMetadata.role || null;
+          const companyId = userMetadata.company_id || null;
+
+          // Check if user already exists
+          const { data: existingUser } = await supabase
+            .from("accounts")
+            .select("id")
+            .eq("email", email)
+            .maybeSingle();
+
+          if (!existingUser && role) {
+            // Create user record
+            await supabase.from("accounts").upsert({
+              id: res.data.user.id,
+              email: email.toLowerCase(),
+              role: role,
+              company_id: companyId || null,
+            });
+          } else if (existingUser && companyId) {
+            // Update company_id if it's missing
+            await supabase
+              .from("accounts")
+              .update({ company_id: companyId })
+              .eq("id", existingUser.id);
+          }
+        }
+
         return { error: null, session: res.data.session };
       }
     } catch (e) {
