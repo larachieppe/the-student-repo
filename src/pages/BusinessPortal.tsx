@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import NavBar from "../components/NavBar";
 import type { TabKey } from "../tabTypes";
 import StudentsSubtabs, { SubtabKey } from "../components/StudentSubtabs";
 import FlexComponent from "../components/FlexComponent";
@@ -316,6 +317,7 @@ export default function BusinessPortal() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans">
+      <NavBar activeTab={activeTab} onChangeTab={setActiveTab} />
       <div className="mb-8">
         {activeTab === "messages" ? (
           // FULL-SCREEN MESSAGES LAYOUT
