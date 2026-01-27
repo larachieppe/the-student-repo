@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import NavBar from "../components/NavBar";
 import type { TabKey } from "../tabTypes";
 import { SubtabKey } from "../components/StudentSubtabs";
 import FlexComponent from "../components/FlexComponent";
@@ -342,6 +343,7 @@ export default function StudentPortal() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans">
+      <NavBar activeTab={activeTab} onChangeTab={setActiveTab} />
       <div className="mb-8">
         <div className="w-full flex items-center justify-between py-6">
           <h1 className="font-sans text-xl ml-2">My Profile</h1>
