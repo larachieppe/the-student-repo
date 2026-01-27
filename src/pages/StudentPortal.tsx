@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import NavBar from "../components/NavBar";
+import type { TabKey } from "../tabTypes";
+import { SubtabKey } from "../components/StudentSubtabs";
 import FlexComponent from "../components/FlexComponent";
 import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
@@ -195,6 +198,7 @@ export default function StudentPortal() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans">
+      <NavBar activeTab={activeTab} onChangeTab={setActiveTab} />
       <div className="mb-8">
         {activeTab === "companies" && <></>}
         {activeTab === "profile" && (

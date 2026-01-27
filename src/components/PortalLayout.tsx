@@ -1,8 +1,7 @@
+import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
-import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
-import type { TabKey } from "../tabTypes";
+import { TabKey } from "../tabTypes";
 
 export default function PortalLayout() {
   const location = useLocation();
@@ -15,9 +14,8 @@ export default function PortalLayout() {
 
   return (
     <div className="bg-white min-h-screen flex flex-col">
-      <NavBar activeTab={activeTab} onChangeTab={setActiveTab} />
       <div className="flex-1">
-        <Outlet />
+        <Outlet context={{ activeTab, setActiveTab }} />
       </div>
       <Footer />
     </div>
