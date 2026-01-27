@@ -96,7 +96,9 @@ export default function MessagesSection({
       const mapped: ConversationSummary[] = data.map((row: any) => ({
         id: row.id,
         name: studentsMap[row.student_id] || "Unknown Student",
-        handle: `@${(studentsMap[row.student_id] || "student").toLowerCase().replace(" ", "")}`,
+        handle: `@${(studentsMap[row.student_id] || "student")
+          .toLowerCase()
+          .replace(" ", "")}`,
         lastMessage: row.messages?.[row.messages.length - 1]?.content ?? "",
         lastActive: "", // format from created_at if you want
         unreadCount: 0,
@@ -126,9 +128,8 @@ export default function MessagesSection({
     const loadMessages = async () => {
       //get current user once
       const {
-        data: { user },
+        data: {},
       } = await supabase.auth.getUser();
-      const myId = user?.id;
 
       //fetch messages for this conversation
       const { data, error } = await supabase

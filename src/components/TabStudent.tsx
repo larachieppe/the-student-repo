@@ -2,9 +2,9 @@ import { useRef } from "react";
 import type { StudentTabKey } from "../tabTypes";
 
 const tabDefs = [
-  { key: "businesses", label: "BUSINESSES" },
-  { key: "shortlist", label: "SHORTLIST" },
-  { key: "edit-profile", label: "EDIT PROFILE" },
+  { key: "companies", label: "COMPANIES" },
+  { key: "profile", label: "MY PROFILE" },
+  { key: "messages", label: "MESSAGES" },
 ] as const;
 
 export type TabKey = StudentTabKey;
