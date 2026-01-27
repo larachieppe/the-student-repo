@@ -16,6 +16,11 @@ interface HumbleFlexSubmission {
   email: string;
 }
 
+type CompanyRow = {
+  id: string;
+  name: string | null;
+};
+
 type ProfileRow = {
   first_name: string | null;
   last_name: string | null;
@@ -33,6 +38,8 @@ type ProfileRow = {
 
 export default function StudentPortal() {
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
+  const [companies, setCompanies] = useState<CompanyRow[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
 
   const [humbleFlexSubmissions, setHumbleFlexSubmissions] = useState<
     HumbleFlexSubmission[]
@@ -107,6 +114,31 @@ export default function StudentPortal() {
 
     loadProfileFromSubmissions();
   }, [email]);
+
+  useEffect(() => {
+    const loadCompanies = async () => {
+      setLoadingCompanies(true);
+      try {
+        const { data, error } = await supabase
+          .from("companies")
+          .select("id,name")
+          .order("name", { ascending: true });
+
+        // IMPORTANT: log the error so you can see it in console
+        if (error) {
+          console.error("Error loading companies:", error);
+          return;
+        }
+
+        console.log("Companies data:", data);
+        setCompanies((data as CompanyRow[]) ?? []);
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+
+    loadCompanies();
+  }, []);
 
   useEffect(() => {
     if (!email) return;
@@ -198,7 +230,27 @@ export default function StudentPortal() {
     <div className="min-h-screen flex flex-col bg-white font-sans">
       <NavBar activeTab={activeTab} onChangeTab={setActiveTab} />
       <div className="mb-8">
-        {activeTab === "companies" && <></>}
+        {activeTab === "companies" && (
+          <div className="mx-2 mt-6">
+            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                Companies
+              </h3>
+
+              {loadingCompanies ? (
+                <p className="text-gray-500 py-6">Loading companies...</p>
+              ) : companies.length === 0 ? (
+                <p className="text-gray-500 py-6">No companies found.</p>
+              ) : (
+                <div className="space-y-4">
+                  {companies.map((company) => (
+                    <CompanyCard key={company.id} company={company} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {activeTab === "profile" && (
           <>
             <div className="w-full flex items-center justify-between py-6">
@@ -367,7 +419,17 @@ export default function StudentPortal() {
             </div>
           </>
         )}
-        {activeTab === "messages" && <></>}
+        {activeTab === "messages" && (
+          <>
+            <div className="mx-2 mt-6">
+              <div className="bg-white border border-gray-200 rounded-2xl p-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                  Messages
+                </h3>
+              </div>
+            </div>
+          </>
+        )}
       </div>
       {isEditOpen ? (
         <div className="fixed inset-0 z-50">
@@ -507,6 +569,24 @@ export default function StudentPortal() {
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function CompanyCard({ company }: { company: CompanyRow }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="text-lg font-semibold text-gray-900">
+            {company.name}
+          </h4>
+        </div>
+
+        <div className="h-10 w-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center">
+          🏢
+        </div>
+      </div>
     </div>
   );
 }
