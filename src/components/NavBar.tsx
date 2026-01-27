@@ -50,18 +50,29 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
   return (
     <header className="sticky top-0 z-50 border-b bg-white border-brand-line/60 backdrop-blur">
       <nav className="container-tight flex h-16 items-center justify-between">
-        <Link
-          to="/"
-          onClick={scrollToTop}
-          className="group inline-flex items-center gap-2"
-        >
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md">
-            <img src={logo} alt="Logo" />
-          </span>
-          <span className="font-semibold tracking-tight font-sans">
-            THE&nbsp;REPO
-          </span>
-        </Link>
+        {user ? (
+          <div className="group inline-flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-md">
+              <img src={logo} alt="Logo" />
+            </span>
+            <span className="font-semibold tracking-tight font-sans">
+              THE&nbsp;REPO
+            </span>
+          </div>
+        ) : (
+          <Link
+            to="/"
+            onClick={scrollToTop}
+            className="group inline-flex items-center gap-2"
+          >
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-md">
+              <img src={logo} alt="Logo" />
+            </span>
+            <span className="font-semibold tracking-tight font-sans">
+              THE&nbsp;REPO
+            </span>
+          </Link>
+        )}
 
         {/* center content */}
         {isHome && (
