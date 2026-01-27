@@ -57,26 +57,68 @@ interface StudentProfile {
 
 interface BiosSectionProps {
   searchTerm: string;
+  sortOrder?: "asc" | "desc";
   onStartConversation: (studentId: string) => void;
   shortlist?: StudentProfile[];
   onToggleShortlist?: (student: StudentProfile) => void;
+  filterToShortlist?: boolean;
 }
 
 export default function BiosSection({
   searchTerm,
+  sortOrder = "asc",
   onStartConversation,
   shortlist = [],
   onToggleShortlist,
+  filterToShortlist = false,
 }: BiosSectionProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const studentsPerPage = 10;
 
   useEffect(() => {
     const fetchStudents = async () => {
       setLoading(true);
       setError(null);
 
+      // If filtering to shortlist, fetch only those students
+      if (filterToShortlist) {
+        if (shortlist.length === 0) {
+          setStudents([]);
+          setLoading(false);
+          return;
+        }
+
+        const shortlistIds = shortlist.map((s) => s.id);
+        const { data, error } = await supabase
+          .from("submissions")
+          .select("*")
+          .in("id", shortlistIds);
+
+        if (error) {
+          console.error("Error fetching shortlist submissions:", error);
+          setError(error.message);
+          setLoading(false);
+          return;
+        }
+
+        let mapped =
+          (data as Submission[] | null)?.map(mapSubmissionToStudent) ?? [];
+
+        // Apply sorting
+        mapped.sort((a, b) => {
+          const comparison = a.name.localeCompare(b.name);
+          return sortOrder === "asc" ? comparison : -comparison;
+        });
+
+        setStudents(mapped);
+        setLoading(false);
+        return;
+      }
+
+      // Otherwise, fetch all students with optional search
       const term = searchTerm.trim();
       let query;
 
@@ -89,8 +131,7 @@ export default function BiosSection({
         // Default query if no search term
         query = supabase
           .from("submissions")
-          .select("*")
-          .order("id", { ascending: false }); // newest first (optional)
+          .select("*");
       }
 
       const { data, error } = await query;
@@ -102,14 +143,44 @@ export default function BiosSection({
         return;
       }
 
-      const mapped =
+      let mapped =
         (data as Submission[] | null)?.map(mapSubmissionToStudent) ?? [];
+
+      // Apply sorting
+      mapped.sort((a, b) => {
+        const comparison = a.name.localeCompare(b.name);
+        return sortOrder === "asc" ? comparison : -comparison;
+      });
+
       setStudents(mapped);
       setLoading(false);
     };
 
     fetchStudents();
-  }, [searchTerm]);
+  }, [searchTerm, sortOrder, filterToShortlist, shortlist]);
+
+  // Reset to page 1 when search term or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortOrder, filterToShortlist]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(students.length / studentsPerPage);
+  const indexOfLastStudent = currentPage * studentsPerPage;
+  const indexOfFirstStudent = indexOfLastStudent - studentsPerPage;
+  const currentStudents = students.slice(indexOfFirstStudent, indexOfLastStudent);
+
+  const goToNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
 
   if (loading) {
     return (
@@ -143,7 +214,7 @@ export default function BiosSection({
   return (
     <div className="w-full font-inter">
       <div className="space-y-6">
-        {students.map((student) => (
+        {currentStudents.map((student) => (
           <div
             key={student.id}
             className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
@@ -346,6 +417,65 @@ export default function BiosSection({
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex items-center justify-center gap-2">
+          <button
+            onClick={goToPreviousPage}
+            disabled={currentPage === 1}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+              // Show first page, last page, current page, and pages around current
+              const showPage =
+                page === 1 ||
+                page === totalPages ||
+                (page >= currentPage - 1 && page <= currentPage + 1);
+
+              const showEllipsis =
+                (page === 2 && currentPage > 3) ||
+                (page === totalPages - 1 && currentPage < totalPages - 2);
+
+              if (showEllipsis) {
+                return (
+                  <span key={page} className="px-2 text-gray-500">
+                    ...
+                  </span>
+                );
+              }
+
+              if (!showPage) return null;
+
+              return (
+                <button
+                  key={page}
+                  onClick={() => goToPage(page)}
+                  className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                    currentPage === page
+                      ? "bg-brand-blue text-white"
+                      : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {page}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={goToNextPage}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }

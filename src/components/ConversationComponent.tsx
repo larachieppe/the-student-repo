@@ -208,9 +208,8 @@ export default function MessagesSection({
 
   return (
     <div
-      className="flex overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm
-      w-full sm:w-[640px] md:w-[768px] lg:w-[960px] xl:w-[1240px]
-      h-[450px] sm:h-[500px] md:h-[550px] lg:h-[600px] xl:h-[650px] mx-auto"
+      className="flex overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm w-full max-w-7xl mx-auto"
+      style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}
     >
       {/* Left: conversation list */}
       <aside className="w-1/3 border-r border-slate-200 flex flex-col">
