@@ -9,6 +9,8 @@ type ProjectCardProps = {
   studentId?: string;
   onViewProject?: () => void;
   onStartConversation?: (studentId: string) => void;
+  isShortlisted?: boolean;
+  onToggleShortlist?: () => void;
 };
 
 export default function ProjectCard({
@@ -22,6 +24,8 @@ export default function ProjectCard({
   studentId,
   onViewProject,
   onStartConversation,
+  isShortlisted = false,
+  onToggleShortlist,
 }: ProjectCardProps) {
   const handleViewProject = () => {
     if (projectUrl) {
@@ -153,12 +157,17 @@ export default function ProjectCard({
           </button>
 
           {/* Bookmark */}
-          <button className="rounded-full p-1.5 hover:bg-slate-100">
+          <button
+            className="rounded-full p-1.5 hover:bg-slate-100 disabled:opacity-50"
+            onClick={onToggleShortlist}
+            disabled={!onToggleShortlist}
+            aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+          >
             <svg
               width="18"
               height="18"
               viewBox="0 0 24 24"
-              fill="none"
+              fill={isShortlisted ? "currentColor" : "none"}
               stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"

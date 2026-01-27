@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import type { TabKey } from "../tabTypes";
 import StudentsSubtabs, { SubtabKey } from "../components/StudentSubtabs";
 import FlexComponent from "../components/FlexComponent";
@@ -7,6 +8,11 @@ import BiosSection from "../components/BioSection";
 import MessagesSection from "../components/ConversationComponent";
 import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
+
+type OutletContext = {
+  activeTab: TabKey;
+  setActiveTab: (tab: TabKey) => void;
+};
 
 interface HumbleFlexSubmission {
   id: string;
@@ -49,7 +55,7 @@ type StudentProfile = {
 };
 
 export default function BusinessPortal() {
-  const [activeTab, setActiveTab] = useState<TabKey>("students");
+  const { activeTab, setActiveTab } = useOutletContext<OutletContext>();
   const [activeSubtab, setActiveSubtab] = useState<SubtabKey>("humble");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [profilesCount, setProfilesCount] = useState<number | null>(null);
@@ -64,43 +70,185 @@ export default function BusinessPortal() {
   >(null);
   const [shortlist, setShortlist] = useState<StudentProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const { user } = useAuth();
 
-  const toggleShortlist = (student: StudentProfile) => {
-    setShortlist((current) => {
-      const alreadyInList = current.some((s) => s.id === student.id);
+  // Load user's company_id
+  useEffect(() => {
+    const loadUserCompany = async () => {
+      if (!user) return;
 
-      if (alreadyInList) {
-        return current.filter((s) => s.id !== student.id);
+      const { data, error } = await supabase
+        .from("accounts")
+        .select("company_id")
+        .eq("id", user.id)
+        .single();
+
+      if (error) {
+        console.error("Error loading user company:", error);
+        return;
       }
 
-      return [...current, student];
-    });
-  };
+      setCompanyId(data?.company_id || null);
+    };
 
-  const handleStartConversation = async (studentId: string) => {
-    if (!user) return; // not logged in
+    loadUserCompany();
+  }, [user]);
 
-    // assume conversations table has business_id & student_id with a UNIQUE constraint on (business_id, student_id)
-    const { data, error } = await supabase
-      .from("conversations")
-      .upsert(
-        {
-          business_id: user.id,
-          student_id: studentId,
-        },
-        { onConflict: "business_id,student_id" }
-      )
-      .select("id")
-      .single();
+  // Load shortlist from database
+  useEffect(() => {
+    const loadShortlist = async () => {
+      if (!companyId) return;
 
-    if (error) {
-      console.error("Error starting conversation", error);
+      // First, get the shortlisted student IDs
+      const { data: shortlistData, error: shortlistError } = await supabase
+        .from("shortlists")
+        .select("student_id")
+        .eq("company_id", companyId);
+
+      if (shortlistError) {
+        console.error("Error loading shortlist:", shortlistError);
+        return;
+      }
+
+      if (!shortlistData || shortlistData.length === 0) {
+        setShortlist([]);
+        return;
+      }
+
+      // Get the student IDs
+      const studentIds = shortlistData.map((item) => item.student_id);
+
+      // Then fetch the submission details for those students
+      const { data: submissions, error: submissionsError } = await supabase
+        .from("submissions")
+        .select("id, first_name, last_name, school, graduation_year")
+        .in("id", studentIds);
+
+      if (submissionsError) {
+        console.error("Error loading submissions:", submissionsError);
+        return;
+      }
+
+      // Map to StudentProfile format
+      const profiles: StudentProfile[] = (submissions || []).map((sub: any) => {
+        const graduationYear = sub.graduation_year?.slice(-2) || "";
+        return {
+          id: sub.id,
+          name: `${sub.first_name} ${sub.last_name}`,
+          school: `${sub.school}${graduationYear ? ` '${graduationYear}` : ""}`,
+        };
+      });
+
+      setShortlist(profiles);
+    };
+
+    loadShortlist();
+  }, [companyId]);
+
+  const toggleShortlist = async (student: StudentProfile) => {
+    if (!companyId) {
+      console.error("No company_id found for user");
       return;
     }
 
-    setInitialConversationId(data.id);
-    setActiveTab("messages");
+    const alreadyInList = shortlist.some((s) => s.id === student.id);
+
+    if (alreadyInList) {
+      // Remove from database
+      const { error } = await supabase
+        .from("shortlists")
+        .delete()
+        .eq("company_id", companyId)
+        .eq("student_id", student.id);
+
+      if (error) {
+        console.error("Error removing from shortlist:", error);
+        return;
+      }
+
+      // Update local state
+      setShortlist((current) => current.filter((s) => s.id !== student.id));
+    } else {
+      // Add to database
+      const { error } = await supabase
+        .from("shortlists")
+        .insert({
+          company_id: companyId,
+          student_id: student.id,
+        });
+
+      if (error) {
+        console.error("Error adding to shortlist:", error);
+        return;
+      }
+
+      // Update local state
+      setShortlist((current) => [...current, student]);
+    }
+  };
+
+  const handleStartConversation = async (studentId: string) => {
+    if (!user || !companyId) return; // not logged in or no company
+
+    try {
+      // Check if a conversation already exists for this company and student
+      const { data: existingConv, error: searchError } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("student_id", studentId)
+        .maybeSingle();
+
+      if (searchError) {
+        console.error("Error searching conversations:", searchError);
+        return;
+      }
+
+      let conversationId: string;
+
+      if (existingConv) {
+        // Conversation already exists
+        conversationId = existingConv.id;
+      } else {
+        // Create new conversation
+        const { data: newConv, error: createError } = await supabase
+          .from("conversations")
+          .insert({
+            company_id: companyId,
+            student_id: studentId,
+            title: `Conversation with student`,
+          })
+          .select("id")
+          .single();
+
+        if (createError) {
+          console.error("Error creating conversation:", createError);
+          return;
+        }
+
+        conversationId = newConv.id;
+
+        // Add business user as participant
+        const { error: participantsError } = await supabase
+          .from("conversation_participants")
+          .insert({
+            conversation_id: conversationId,
+            user_id: user.id,
+            role: "business",
+          });
+
+        if (participantsError) {
+          console.error("Error adding participant:", participantsError);
+          return;
+        }
+      }
+
+      setInitialConversationId(conversationId);
+      setActiveTab("messages");
+    } catch (err) {
+      console.error("Unexpected error starting conversation:", err);
+    }
   };
 
   // Parse side_projects text into project objects
@@ -322,6 +470,7 @@ export default function BusinessPortal() {
           <main className="flex-1 flex justify-center items-start bg-white pt-8">
             <MessagesSection
               initialConversationId={initialConversationId ?? undefined}
+              companyId={companyId ?? undefined}
             />
           </main>
         ) : (
@@ -422,7 +571,7 @@ export default function BusinessPortal() {
                           const authorSchool = `${submission.school} '${
                             submission.graduation_year?.slice(-2) || ""
                           }`;
-                          const studentId = submission.email;
+                          const studentId = submission.id;
 
                           const studentProfile: StudentProfile = {
                             id: studentId,
@@ -463,20 +612,34 @@ export default function BusinessPortal() {
                         No projects found.
                       </div>
                     ) : (
-                      projects.map((project) => (
-                        <ProjectCard
-                          key={project.id}
-                          title={project.title}
-                          description={project.description}
-                          tags={project.tags}
-                          authorName={project.authorName}
-                          authorSchool={project.authorSchool}
-                          projectImage={project.projectImage}
-                          projectUrl={project.projectUrl}
-                          studentId={project.studentId}
-                          onStartConversation={handleStartConversation}
-                        />
-                      ))
+                      projects.map((project) => {
+                        const studentProfile: StudentProfile = {
+                          id: project.studentId,
+                          name: project.authorName,
+                          school: project.authorSchool,
+                        };
+
+                        return (
+                          <ProjectCard
+                            key={project.id}
+                            title={project.title}
+                            description={project.description}
+                            tags={project.tags}
+                            authorName={project.authorName}
+                            authorSchool={project.authorSchool}
+                            projectImage={project.projectImage}
+                            projectUrl={project.projectUrl}
+                            studentId={project.studentId}
+                            onStartConversation={handleStartConversation}
+                            isShortlisted={shortlist.some(
+                              (s) => s.id === studentProfile.id
+                            )}
+                            onToggleShortlist={() =>
+                              toggleShortlist(studentProfile)
+                            }
+                          />
+                        );
+                      })
                     )}
                   </div>
                 )}
@@ -484,6 +647,8 @@ export default function BusinessPortal() {
                   <BiosSection
                     searchTerm={searchTerm}
                     onStartConversation={handleStartConversation}
+                    shortlist={shortlist}
+                    onToggleShortlist={toggleShortlist}
                   />
                 )}
               </>

@@ -49,12 +49,25 @@ function mapSubmissionToStudent(sub: Submission): Student {
   };
 }
 
+interface StudentProfile {
+  id: string;
+  name: string;
+  school: string;
+}
+
 interface BiosSectionProps {
   searchTerm: string;
   onStartConversation: (studentId: string) => void;
+  shortlist?: StudentProfile[];
+  onToggleShortlist?: (student: StudentProfile) => void;
 }
 
-export default function BiosSection({searchTerm, onStartConversation}: BiosSectionProps) {
+export default function BiosSection({
+  searchTerm,
+  onStartConversation,
+  shortlist = [],
+  onToggleShortlist,
+}: BiosSectionProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -175,12 +188,34 @@ export default function BiosSection({searchTerm, onStartConversation}: BiosSecti
                       </svg>
                     </button>
 
-                    <button className="rounded-full p-1.5 hover:bg-slate-100">
+                    <button
+                      className="rounded-full p-1.5 hover:bg-slate-100 disabled:opacity-50"
+                      onClick={() => {
+                        if (onToggleShortlist) {
+                          const studentProfile: StudentProfile = {
+                            id: student.id,
+                            name: student.name,
+                            school: `${student.university} '${student.graduationYear?.slice(-2) || ""}`,
+                          };
+                          onToggleShortlist(studentProfile);
+                        }
+                      }}
+                      disabled={!onToggleShortlist}
+                      aria-label={
+                        shortlist.some((s) => s.id === student.id)
+                          ? "Remove from shortlist"
+                          : "Add to shortlist"
+                      }
+                    >
                       <svg
                         width="18"
                         height="18"
                         viewBox="0 0 24 24"
-                        fill="none"
+                        fill={
+                          shortlist.some((s) => s.id === student.id)
+                            ? "currentColor"
+                            : "none"
+                        }
                         stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"

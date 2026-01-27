@@ -20,10 +20,12 @@ type Message = {
 
 type MessagesSectionProps = {
   initialConversationId?: string;
+  companyId?: string;
 };
 
 export default function MessagesSection({
   initialConversationId,
+  companyId,
 }: MessagesSectionProps) {
   const [selectedId, setSelectedId] = useState<string | null>(
     initialConversationId ?? null
@@ -39,13 +41,15 @@ export default function MessagesSection({
 
   useEffect(() => {
     const loadConversations = async () => {
-      const { data, error } = await supabase
+      // Build query to filter by company_id for business users
+      let query = supabase
         .from("conversations")
         .select(
           `
           id,
+          student_id,
           messages:messages(
-            body,
+            content,
             created_at
           ),
           participants:conversation_participants(
@@ -55,17 +59,45 @@ export default function MessagesSection({
         )
         .order("updated_at", { ascending: false });
 
+      // Filter by company_id if provided (for business users)
+      if (companyId) {
+        query = query.eq("company_id", companyId);
+      }
+
+      const { data, error } = await query;
+
       if (error) {
         console.error("Error loading conversations", error);
         return;
       }
 
+      // Get unique student IDs to fetch their names
+      const studentIds = data
+        .map((row: any) => row.student_id)
+        .filter((id: string | null) => id !== null);
+
+      // Fetch student names from submissions table
+      let studentsMap: { [key: string]: string } = {};
+      if (studentIds.length > 0) {
+        const { data: students, error: studentsError } = await supabase
+          .from("submissions")
+          .select("id, first_name, last_name")
+          .in("id", studentIds);
+
+        if (!studentsError && students) {
+          studentsMap = students.reduce((acc: any, student: any) => {
+            acc[student.id] = `${student.first_name} ${student.last_name}`;
+            return acc;
+          }, {});
+        }
+      }
+
       // Map supabase rows into your ConversationSummary shape
       const mapped: ConversationSummary[] = data.map((row: any) => ({
         id: row.id,
-        name: "TODO: student name", // you can join to profiles later
-        handle: "@todo",
-        lastMessage: row.messages?.[row.messages.length - 1]?.body ?? "",
+        name: studentsMap[row.student_id] || "Unknown Student",
+        handle: `@${(studentsMap[row.student_id] || "student").toLowerCase().replace(" ", "")}`,
+        lastMessage: row.messages?.[row.messages.length - 1]?.content ?? "",
         lastActive: "", // format from created_at if you want
         unreadCount: 0,
       }));
@@ -86,7 +118,7 @@ export default function MessagesSection({
     };
 
     loadConversations();
-  }, [initialConversationId]);
+  }, [initialConversationId, companyId]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -101,7 +133,7 @@ export default function MessagesSection({
       //fetch messages for this conversation
       const { data, error } = await supabase
         .from("messages")
-        .select("id, body, sender_id, created_at, conversation_id")
+        .select("id, content, sender, created_at, conversation_id")
         .eq("conversation_id", selectedId)
         .order("created_at", { ascending: true });
 
@@ -111,12 +143,13 @@ export default function MessagesSection({
       }
 
       //map without any await inside map
+      // sender is "students" or "businessUsers", business user sees "businessUsers" messages as "me"
       setMessages(
         data.map((m: any) => ({
           id: m.id,
           conversationId: m.conversation_id,
-          from: m.sender_id === myId ? "me" : "them",
-          text: m.body,
+          from: m.sender === "businessUsers" ? "me" : "them",
+          text: m.content,
           timestamp: new Date(m.created_at).toLocaleTimeString([], {
             hour: "numeric",
             minute: "2-digit",
@@ -141,8 +174,10 @@ export default function MessagesSection({
       .from("messages")
       .insert({
         conversation_id: selectedId,
-        sender_id: user.id,
-        body: draft.trim(),
+        business_id: user.id,
+        student_id: null,
+        sender: "businessUsers", // Must be 'students' or 'businessUsers'
+        content: draft.trim(),
       })
       .select()
       .single();
@@ -159,7 +194,7 @@ export default function MessagesSection({
         id: data.id,
         conversationId: data.conversation_id,
         from: "me",
-        text: data.body,
+        text: data.content,
         timestamp: new Date(data.created_at).toLocaleTimeString([], {
           hour: "numeric",
           minute: "2-digit",
