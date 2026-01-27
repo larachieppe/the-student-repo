@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
 import type { TabKey } from "../tabTypes";
-import StudentsSubtabs, { SubtabKey } from "../components/StudentSubtabs";
+import { SubtabKey } from "../components/StudentSubtabs";
 import FlexComponent from "../components/FlexComponent";
-import ProjectCard from "../components/ProjectComponent";
-import BiosSection from "../components/BioSection";
-import MessagesSection from "../components/ConversationComponent";
 import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
 
@@ -66,17 +63,43 @@ export default function StudentPortal() {
   const [searchTerm, setSearchTerm] = useState("");
   const { user } = useAuth();
 
-  const toggleShortlist = (student: StudentProfile) => {
-    setShortlist((current) => {
-      const alreadyInList = current.some((s) => s.id === student.id);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
 
-      if (alreadyInList) {
-        return current.filter((s) => s.id !== student.id);
-      }
+  const [profile, setProfile] = useState({
+    profilePictureUrl: "" as string,
+    fullName: "" as string,
+    major: "" as string,
+    school: "" as string,
+    gradYear: "" as string,
+    location: "" as string,
+    workType: "" as string,
+    workStyle: "" as string,
+    skills: [] as string[],
+    about: "" as string,
+  });
 
-      return [...current, student];
+  const myFlex = humbleFlexSubmissions[0];
+
+  // Load from auth user_metadata on mount / when user changes
+  useEffect(() => {
+    if (!user) return;
+
+    const md = (user.user_metadata ?? {}) as any;
+
+    setProfile({
+      profilePictureUrl: md.profilePictureUrl ?? "",
+      fullName: md.fullName ?? "",
+      major: md.major ?? "",
+      school: md.school ?? "",
+      gradYear: md.gradYear ?? "",
+      location: md.location ?? "",
+      workType: md.workType ?? "",
+      workStyle: md.workStyle ?? "",
+      skills: Array.isArray(md.skills) ? md.skills : [],
+      about: md.about ?? "",
     });
-  };
+  }, [user]);
 
   const handleStartConversation = async (studentId: string) => {
     if (!user) return; // not logged in
@@ -184,58 +207,30 @@ export default function StudentPortal() {
 
   useEffect(() => {
     if (activeSubtab !== "humble") return;
+    if (!user || !user.email) return; // ✅ narrow user
 
     const loadHumbleFlex = async () => {
       setLoadingFlex(true);
       try {
-        const term = searchTerm.trim();
-        let data: any[] | null = null;
-        let error: any = null;
+        let data: HumbleFlexSubmission[] = [];
 
-        if (term) {
-          const rpcResult = await supabase
-            .rpc("search_submissions_ci", { search_term: term })
-            .select(
-              "id, first_name, last_name, school, graduation_year, flex, skills, email"
-            );
-
-          data = rpcResult.data as HumbleFlexSubmission[];
-          error = rpcResult.error;
-        } else {
-          let query = supabase
-            .from("submissions")
-            .select(
-              "id, first_name, last_name, school, graduation_year, flex, skills, email"
-            )
-            .not("flex", "is", null)
-            .neq("flex", "");
-
-          if (sortOrder === "asc") {
-            query = query.order("last_name", { ascending: true });
-          } else {
-            query = query.order("last_name", { ascending: false });
-          }
-
-          const defaultResult = await query;
-          data = defaultResult.data;
-          error = defaultResult.error;
-        }
+        const { data: result, error } = await supabase
+          .from("submissions")
+          .select(
+            "id, first_name, last_name, school, graduation_year, flex, skills, email"
+          )
+          .eq("email", user.email)
+          .not("flex", "is", null)
+          .neq("flex", "");
 
         if (error) {
           console.error("Error loading humble flex submissions", error);
           return;
         }
 
-        let sortedData = (data as HumbleFlexSubmission[]) || [];
+        data = result ?? [];
 
-        if (term) {
-          sortedData.sort((a, b) => {
-            const comparison = a.last_name.localeCompare(b.last_name);
-            return sortOrder === "asc" ? comparison : -comparison;
-          });
-        }
-
-        setHumbleFlexSubmissions(sortedData);
+        setHumbleFlexSubmissions(data);
       } catch (err) {
         console.error("Unexpected error", err);
       } finally {
@@ -244,7 +239,7 @@ export default function StudentPortal() {
     };
 
     loadHumbleFlex();
-  }, [activeSubtab, sortOrder, searchTerm]);
+  }, [activeSubtab, user]);
 
   useEffect(() => {
     const loadProjects = async () => {
@@ -314,212 +309,401 @@ export default function StudentPortal() {
     loadProjects();
   }, [activeSubtab, sortOrder, searchTerm]);
 
+  const saveProfile = async () => {
+    if (!user) return;
+
+    setSavingProfile(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          profilePictureUrl: profile.profilePictureUrl,
+          fullName: profile.fullName,
+          major: profile.major,
+          school: profile.school,
+          gradYear: profile.gradYear,
+          location: profile.location,
+          workType: profile.workType,
+          workStyle: profile.workStyle,
+          skills: profile.skills,
+          about: profile.about,
+        },
+      });
+
+      if (error) {
+        console.error("Error saving profile:", error);
+        return;
+      }
+
+      setIsEditOpen(false);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans">
       <div className="mb-8">
-        {activeTab === "messages" ? (
-          // FULL-SCREEN MESSAGES LAYOUT
-          <main className="flex-1 flex justify-center items-start bg-white pt-8">
-            <MessagesSection
-              initialConversationId={initialConversationId ?? undefined}
-            />
-          </main>
-        ) : (
-          // EXISTING LAYOUT FOR OTHER TABS
-          <main className="flex-1 w-full max-w-7xl mx-auto px-4 mt-10">
-            {activeTab === "students" && (
+        <div className="w-full flex items-center justify-between py-6">
+          <h1 className="font-sans text-xl ml-2">My Profile</h1>
+          <button
+            onClick={() => setIsEditOpen(true)}
+            className="inline-flex font-sans items-center gap-2 rounded-full border-2 border-brand-blue px-5 py-2 text-black hover:bg-brand-blue/5 transition"
+          >
+            {/* simple pencil icon */}
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16.862 3.487a2.1 2.1 0 013 2.97L8.7 17.62l-4.2 1.2 1.2-4.2L16.862 3.487z"
+              />
+            </svg>
+            Edit Profile
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-8 mt-6">
+          {/* LEFT: Profile sidebar */}
+          <aside className="bg-white border border-gray-200 rounded-2xl p-6 h-fit sticky top-6">
+            <div className="flex flex-col items-center text-center">
+              {profile.profilePictureUrl ? (
+                <img
+                  src={profile.profilePictureUrl}
+                  alt="Profile"
+                  className="w-28 h-28 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-28 h-28 rounded-full bg-gray-100 border border-gray-200" />
+              )}
+              {profile.fullName ? (
+                <h2 className="mt-4 text-2xl font-semibold text-gray-900">
+                  {profile.fullName}
+                </h2>
+              ) : null}
+
+              {profile.major ? (
+                <p className="text-gray-500 mt-1">{profile.major}</p>
+              ) : null}
+              <p className="text-gray-500 mt-1">
+                {profile.major ?? "Computer Science"}
+              </p>
+            </div>
+
+            <div className="space-y-3 text-sm text-gray-600">
+              {profile.school ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400">🎓</span>
+                  <span>{profile.school}</span>
+                </div>
+              ) : null}
+
+              {profile.gradYear ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400">📅</span>
+                  <span>{`Class of ${profile.gradYear}`}</span>
+                </div>
+              ) : null}
+
+              {location ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400">📍</span>
+                  <span>{profile.location}</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="my-6 border-t border-gray-200" />
+
+            <div className="space-y-3">
+              <button className="w-full rounded-xl border border-gray-300 py-2 text-sm font-medium hover:bg-gray-50 transition">
+                GitHub
+              </button>
+
+              <button className="w-full rounded-xl border border-gray-300 py-2 text-sm font-medium hover:bg-gray-50 transition">
+                LinkedIn
+              </button>
+            </div>
+
+            {profile.workType || profile.workStyle ? (
               <>
-                <div className="flex justify-between">
-                  <div className="flex items-center gap-6">
-                    <h1 className="text-xl font-semibold">Students</h1>
-                    <StudentsSubtabs
-                      active={activeSubtab}
-                      setActive={setActiveSubtab}
-                    />
-                  </div>
-                  <div className="ml-6 flex-1 justify-end">
-                    <div className="relative w-full">
-                      <input
-                        type="text"
-                        placeholder="Search name, school, or skill..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="flex font-sans text-sm items-center w-full px-4 py-1.5 gap-2 text-black rounded-xl border border-gray-300 focus:border-brand-blue hover:bg-brand-blue/5 transition"
-                      />
-                      <svg
-                        className="w-4 h-4 text-brand-blue absolute right-3 top-1/2 transform -translate-y-1/2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                        />
-                      </svg>
-                    </div>
+                <div className="my-6 border-t border-gray-200" />
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                    Work Preferences
+                  </h3>
+                  <div className="text-sm text-gray-600 space-y-2">
+                    {profile.workType ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">💼</span>
+                        <span>{profile.workType}</span>
+                      </div>
+                    ) : null}
+                    {profile.workStyle ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">🧭</span>
+                        <span>{profile.workStyle}</span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
-                <div className="flex justify-between mt-4">
-                  <div className="text-gray-400">
-                    {activeSubtab === "projects"
-                      ? projectsLoading
-                        ? "Loading projects…"
-                        : `${projects.length} ${
-                            projects.length === 1 ? "project" : "projects"
-                          }`
-                      : profilesCount === null
-                      ? "Loading profiles…"
-                      : `${profilesCount} profiles`}
-                  </div>
-
-                  <div className="flex items-center justify-end gap-4 mb-4">
-                    <div className="relative">
-                      <select
-                        value={sortOrder}
-                        onChange={(e) =>
-                          setSortOrder(e.target.value as "asc" | "desc")
-                        }
-                        className="px-4 py-2 text-sm rounded-lg hover:bg-gray-50 appearance-none pr-8"
-                      >
-                        <option value="asc">Alphabetical</option>
-                        <option value="desc">Recent</option>
-                      </select>
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <svg
-                          className="w-4 h-4 text-gray-500"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {activeSubtab === "humble" && (
-                  <div className="flex items-center justify-center">
-                    {loadingFlex ? (
-                      <p className="text-gray-500 py-10">
-                        Loading humble flex posts...
-                      </p>
-                    ) : humbleFlexSubmissions.length === 0 ? (
-                      <p className="text-gray-500 py-10">
-                        No humble flex posts yet.
-                      </p>
-                    ) : (
-                      <div className="space-y-6">
-                        {humbleFlexSubmissions.map((submission) => {
-                          const authorName = `${submission.first_name} ${submission.last_name}`;
-                          const authorSchool = `${submission.school} '${
-                            submission.graduation_year?.slice(-2) || ""
-                          }`;
-                          const studentId = submission.email;
-
-                          const studentProfile: StudentProfile = {
-                            id: studentId,
-                            name: authorName,
-                            school: authorSchool,
-                          };
-
-                          return (
-                            <FlexComponent
-                              key={submission.id}
-                              authorName={authorName}
-                              authorSchool={authorSchool}
-                              flexContent={submission.flex}
-                              skills={submission.skills || []}
-                              studentId={studentId}
-                              onStartConversation={handleStartConversation}
-                              isShortlisted={shortlist.some(
-                                (s) => s.id === studentProfile.id
-                              )}
-                              onToggleShortlist={() =>
-                                toggleShortlist(studentProfile)
-                              }
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {activeSubtab === "projects" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 mb-4">
-                    {projectsLoading ? (
-                      <div className="col-span-2 text-center text-gray-400 py-8">
-                        Loading projects...
-                      </div>
-                    ) : projects.length === 0 ? (
-                      <div className="col-span-2 text-center text-gray-400 py-8">
-                        No projects found.
-                      </div>
-                    ) : (
-                      projects.map((project) => (
-                        <ProjectCard
-                          key={project.id}
-                          title={project.title}
-                          description={project.description}
-                          tags={project.tags}
-                          authorName={project.authorName}
-                          authorSchool={project.authorSchool}
-                          projectImage={project.projectImage}
-                          projectUrl={project.projectUrl}
-                          studentId={project.studentId}
-                          onStartConversation={handleStartConversation}
-                        />
-                      ))
-                    )}
-                  </div>
-                )}
-                {activeSubtab === "bios" && (
-                  <BiosSection
-                    searchTerm={searchTerm}
-                    onStartConversation={handleStartConversation}
-                  />
-                )}
               </>
-            )}
+            ) : null}
 
-            {activeTab === "shortlist" && (
-              <div>
-                <h1 className="text-xl font-semibold mb-4">Shortlist</h1>
+            <div className="my-6 border-t border-gray-200" />
 
-                {shortlist.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    You haven&apos;t shortlisted any students yet. Click the
-                    flag icon on a student profile to save it here.
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {shortlist.map((student) => (
-                      <FlexComponent
-                        key={student.id}
-                        authorName={student.name}
-                        authorSchool={student.school}
-                        studentId={student.id}
-                        onStartConversation={handleStartConversation}
-                        isShortlisted={shortlist.some(
-                          (s) => s.id === student.id
-                        )}
-                        onToggleShortlist={() => toggleShortlist(student)}
-                      />
+            {profile.skills.length > 0 ? (
+              <>
+                <div className="my-6 border-t border-gray-200" />
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                    Skills
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.skills.map((s) => (
+                      <span
+                        key={s}
+                        className="px-3 py-1 rounded-full text-xs border border-brand-blue/30 text-brand-blue bg-brand-blue/5"
+                      >
+                        {s}
+                      </span>
                     ))}
                   </div>
-                )}
-              </div>
-            )}
-          </main>
-        )}
+                </div>
+              </>
+            ) : null}
+          </aside>
+
+          {/* RIGHT: About + Humble Flex feed */}
+          <section className="space-y-6">
+            {/* ABOUT card */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                About
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                {profile.about ??
+                  "Full-stack developer passionate about building scalable web applications. Love working with React, Node.js, and cloud infrastructure. Always excited to learn new technologies and solve challenging problems."}
+              </p>
+            </div>
+
+            {/* HUMBLE FLEX card(s) */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                Humble Flex
+              </h3>
+
+              {loadingFlex ? (
+                <p className="text-gray-500 py-6">
+                  Loading humble flex posts...
+                </p>
+              ) : humbleFlexSubmissions.length === 0 ? (
+                <p className="text-gray-500 py-6">No humble flex posts yet.</p>
+              ) : (
+                <div className="space-y-6">
+                  {!myFlex ? (
+                    <p className="text-gray-500 py-6">
+                      No humble flex posts yet.
+                    </p>
+                  ) : (
+                    <FlexComponent
+                      key={myFlex.id}
+                      authorName={`${myFlex.first_name} ${myFlex.last_name}`}
+                      authorSchool={`${myFlex.school} '${
+                        myFlex.graduation_year?.slice(-2) || ""
+                      }`}
+                      flexContent={myFlex.flex}
+                      skills={myFlex.skills || []}
+                      studentId={myFlex.email}
+                      onStartConversation={handleStartConversation}
+                      isShortlisted={false}
+                      onToggleShortlist={() => {}}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
+      {isEditOpen ? (
+        <div className="fixed inset-0 z-50">
+          {/* backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setIsEditOpen(false)}
+          />
+
+          {/* modal */}
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl rounded-2xl bg-white border border-gray-200 shadow-lg">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Edit profile
+                </h2>
+                <button
+                  onClick={() => setIsEditOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">
+                    Profile picture URL
+                  </label>
+                  <input
+                    value={profile.profilePictureUrl}
+                    onChange={(e) =>
+                      setProfile((p) => ({
+                        ...p,
+                        profilePictureUrl: e.target.value,
+                      }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                    placeholder="https://..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">Full name</label>
+                  <input
+                    value={profile.fullName}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, fullName: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">Major</label>
+                  <input
+                    value={profile.major}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, major: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">School</label>
+                  <input
+                    value={profile.school}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, school: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border bordergray-300 px-4 py-2 text-sm border border-gray-300 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">
+                    Graduation year
+                  </label>
+                  <input
+                    value={profile.gradYear}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, gradYear: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                    placeholder="2026"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">Location</label>
+                  <input
+                    value={profile.location}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, location: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">Work type</label>
+                  <input
+                    value={profile.workType}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, workType: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                    placeholder="Full-Time"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">Work style</label>
+                  <input
+                    value={profile.workStyle}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, workStyle: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                    placeholder="Flexible"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">
+                    Skills (comma-separated)
+                  </label>
+                  <input
+                    value={profile.skills.join(", ")}
+                    onChange={(e) =>
+                      setProfile((p) => ({
+                        ...p,
+                        skills: e.target.value
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean),
+                      }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                    placeholder="React, TypeScript, ..."
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">About</label>
+                  <textarea
+                    value={profile.about}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, about: e.target.value }))
+                    }
+                    className="mt-1 w-full min-h-[120px] rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+                <button
+                  onClick={() => setIsEditOpen(false)}
+                  className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveProfile}
+                  disabled={savingProfile}
+                  className="rounded-xl bg-brand-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {savingProfile ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
