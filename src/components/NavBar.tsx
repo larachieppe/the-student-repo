@@ -81,7 +81,7 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
               About
             </a>
             <a href="#partners" className="hover:text-brand-text">
-              Partners
+              Companies
             </a>
             <a href="#newsletter" className="hover:text-brand-text">
               Newsletter
