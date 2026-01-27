@@ -23,9 +23,9 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
   const { user, signOut } = useAuth();
 
   const studentTabs: TabConfig<StudentTabKey>[] = [
-    { key: "businesses", label: "BUSINESSES" },
-    { key: "shortlist", label: "SHORTLIST" },
-    { key: "edit-profile", label: "EDIT PROFILE" },
+    { key: "companies", label: "COMPANIES" },
+    { key: "profile", label: "MY PROFILE" },
+    { key: "messages", label: "MESSAGES" },
   ];
 
   const businessTabs: TabConfig<BusinessTabKey>[] = [
@@ -37,9 +37,9 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
   let routeTabs = tabs;
   if (!tabs) {
     if (isStudentPortal) {
-      routeTabs = studentTabs; // defined below with StudentTabKey
+      routeTabs = studentTabs;
     } else if (isBusinessPortal) {
-      routeTabs = businessTabs; // defined with BusinessTabKey
+      routeTabs = businessTabs;
     }
   }
 

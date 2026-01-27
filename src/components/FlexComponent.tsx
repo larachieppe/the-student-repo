@@ -9,8 +9,8 @@ type FlexCardProps = {
   onStartConversation?: (studentId: string) => void;
   isShortlisted?: boolean;
   onToggleShortlist?: () => void;
+  showActions?: boolean;
 };
-
 
 export default function FlexComponent({
   authorName,
@@ -21,6 +21,7 @@ export default function FlexComponent({
   onStartConversation,
   isShortlisted = false,
   onToggleShortlist,
+  showActions = true,
 }: FlexCardProps) {
   // Extract title from first line, rest as description
   const lines = flexContent?.split("\n").filter((line) => line.trim()) || [];
@@ -39,51 +40,55 @@ export default function FlexComponent({
         </div>
 
         {/* Comment + Bookmark icons */}
-        <div className="flex items-center gap-3 text-slate-400">
-          {/* Comment → tell parent to start a conversation */}
-          <button
-            type="button"
-            className="rounded-full p-1.5 hover:bg-slate-100"
-            onClick={() => onStartConversation?.(studentId)}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-black"
+        {showActions ? (
+          <div className="flex items-center gap-3 text-slate-400">
+            {/* Comment → tell parent to start a conversation */}
+            <button
+              type="button"
+              className="rounded-full p-1.5 hover:bg-slate-100"
+              onClick={() => onStartConversation?.(studentId)}
             >
-              <path d="M21 11.5c0 4-3.7 7.5-8.5 7.5-1.4 0-2.8-.3-4-.9L3 20l1.3-4.1C3.5 14.3 3 12.9 3 11.5 3 7 6.7 3.5 11.5 3.5S21 7 21 11.5z" />
-            </svg>
-          </button>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-black"
+              >
+                <path d="M21 11.5c0 4-3.7 7.5-8.5 7.5-1.4 0-2.8-.3-4-.9L3 20l1.3-4.1C3.5 14.3 3 12.9 3 11.5 3 7 6.7 3.5 11.5 3.5S21 7 21 11.5z" />
+              </svg>
+            </button>
 
-          {/* Bookmark */}
-          <button
-            type="button"
-            className="rounded-full p-1.5 hover:bg-slate-100 disabled:opacity-50"
-            onClick={onToggleShortlist}
-            disabled={!onToggleShortlist}
-            aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill={isShortlisted ? "currentColor" : "none"}
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-black"
+            {/* Bookmark */}
+            <button
+              type="button"
+              className="rounded-full p-1.5 hover:bg-slate-100 disabled:opacity-50"
+              onClick={onToggleShortlist}
+              disabled={!onToggleShortlist}
+              aria-label={
+                isShortlisted ? "Remove from shortlist" : "Add to shortlist"
+              }
             >
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-            </svg>
-          </button>
-        </div>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill={isShortlisted ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-black"
+              >
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+              </svg>
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {/* Bottom section (unchanged) */}
@@ -110,7 +115,9 @@ export default function FlexComponent({
           {skills.slice(0, 5).map((skill, idx) => (
             <Tag key={idx}>{skill}</Tag>
           ))}
-          {skills.length > 5 && <Tag variant="outline">+{skills.length - 5}</Tag>}
+          {skills.length > 5 && (
+            <Tag variant="outline">+{skills.length - 5}</Tag>
+          )}
         </div>
       </div>
     </article>

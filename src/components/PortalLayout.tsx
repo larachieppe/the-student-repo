@@ -9,7 +9,7 @@ export default function PortalLayout() {
   const [activeTab, setActiveTab] = useState<TabKey>("students");
 
   useEffect(() => {
-    if (location.pathname === "/student-portal") setActiveTab("businesses");
+    if (location.pathname === "/student-portal") setActiveTab("companies");
     if (location.pathname === "/business-portal") setActiveTab("students");
   }, [location.pathname]);
 
