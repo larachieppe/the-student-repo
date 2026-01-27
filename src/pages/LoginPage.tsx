@@ -1,16 +1,19 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Footer from "../components/Footer";
 import { useAuth } from "../useAuth";
 
-type Role = "student" | "business" | "admin"; // ➕ NEW
+type Role = "student" | "business" | "admin";
 
 export default function LoginPage() {
   const [role, setRole] = useState<Role>("student");
-  const { signInWithEmail } = useAuth();
+  const { signInWithEmail, verifyOtp } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState<"email" | "google" | null>(null);
+  const [loading, setLoading] = useState<"email" | "otp" | null>(null);
 
   const handleEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,8 +22,6 @@ export default function LoginPage() {
 
     try {
       const cleanEmail = email.trim().toLowerCase();
-
-      // 🔍 Debug: see exactly what goes to Supabase
       console.log("[Login] cleanEmail =", JSON.stringify(cleanEmail));
 
       const { error } = await signInWithEmail(cleanEmail, role);
@@ -34,6 +35,33 @@ export default function LoginPage() {
         );
       } else {
         setSent(true);
+      }
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    setLoading("otp");
+
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanOtp = otp.trim();
+
+      const { error, session } = await verifyOtp(cleanEmail, cleanOtp);
+      if (error || !session) {
+        console.error("[Supabase verifyOtp error]", error);
+        setErr(
+          (error as any)?.message ??
+            (error as any)?.error_description ??
+            (error as any)?.error ??
+            "Verification failed. Please try again."
+        );
+      } else {
+        localStorage.setItem("loginRole", role);
+        navigate(`/${role}-portal`, { replace: true });
       }
     } finally {
       setLoading(null);
@@ -94,12 +122,40 @@ export default function LoginPage() {
             {sent ? (
               <div className="space-y-3">
                 <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-                  Verification link sent to <b>{email}</b>. Check your inbox to
-                  finish signing in.
+                  A 6-digit code was sent to <b>{email}</b>. Enter it below to
+                  sign in.
                 </div>
+                <form onSubmit={handleVerifyOtp}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Verification Code*
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    required
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    className="w-full border rounded-lg p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-brand-blue text-center text-2xl tracking-widest font-mono"
+                    placeholder="000000"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading === "otp" || otp.length !== 6}
+                    className="w-full bg-brand-blue text-white py-2 rounded-lg hover:bg-brand-blue transition disabled:opacity-60 disabled:cursor-not-allowed flex justify-center"
+                  >
+                    {loading === "otp" ? "Verifying..." : "VERIFY CODE"}
+                  </button>
+                </form>
                 <button
                   type="button"
-                  onClick={() => setSent(false)} // allow entering a different email
+                  onClick={() => {
+                    setSent(false);
+                    setOtp("");
+                    setErr(null);
+                  }}
                   className="w-full border rounded-lg py-2 text-brand-blue hover:bg-gray-50 transition"
                 >
                   Use a different email
@@ -126,7 +182,7 @@ export default function LoginPage() {
                     disabled={loading === "email" || email.trim() === ""}
                     className="w-full bg-brand-blue text-white py-2 rounded-lg hover:bg-brand-blue transition disabled:opacity-60 disabled:cursor-not-allowed flex justify-center"
                   >
-                    {loading === "email" ? "Sending link..." : "CONTINUE"}
+                    {loading === "email" ? "Sending code..." : "CONTINUE"}
                   </button>
                 </form>
               </>
