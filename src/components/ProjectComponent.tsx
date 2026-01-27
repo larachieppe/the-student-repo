@@ -93,7 +93,8 @@ export default function ProjectCard({
         <button
           type="button"
           onClick={handleViewProject}
-          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-brand-blue px-4 py-2.5 text-sm font-semibold text-brand-blue hover:bg-brand-blue/5 transition"
+          disabled={!projectUrl}
+          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-brand-blue px-4 py-2.5 text-sm font-semibold text-brand-blue hover:bg-brand-blue/5 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
         >
           {/* external-link style icon */}
           <svg

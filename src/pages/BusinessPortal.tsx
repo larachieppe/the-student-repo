@@ -46,6 +46,7 @@ type SubmissionRow = {
   school: string;
   graduation_year: string;
   side_projects: string | null;
+  side_project_link?: string | null;
   skills?: string[] | null;
   github?: string | null;
 };
@@ -74,6 +75,32 @@ export default function BusinessPortal() {
   const [searchTerm, setSearchTerm] = useState("");
   const [companyId, setCompanyId] = useState<string | null>(null);
   const { user } = useAuth();
+
+  // Pagination states
+  const [flexCurrentPage, setFlexCurrentPage] = useState(1);
+  const [projectsCurrentPage, setProjectsCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setFlexCurrentPage(1);
+  }, [searchTerm, sortOrder, activeSubtab]);
+
+  useEffect(() => {
+    setProjectsCurrentPage(1);
+  }, [searchTerm, sortOrder, activeSubtab]);
+
+  // Calculate pagination for Humble Flex
+  const flexTotalPages = Math.ceil(humbleFlexSubmissions.length / itemsPerPage);
+  const flexIndexOfLast = flexCurrentPage * itemsPerPage;
+  const flexIndexOfFirst = flexIndexOfLast - itemsPerPage;
+  const currentFlexSubmissions = humbleFlexSubmissions.slice(flexIndexOfFirst, flexIndexOfLast);
+
+  // Calculate pagination for Projects
+  const projectsTotalPages = Math.ceil(projects.length / itemsPerPage);
+  const projectsIndexOfLast = projectsCurrentPage * itemsPerPage;
+  const projectsIndexOfFirst = projectsIndexOfLast - itemsPerPage;
+  const currentProjects = projects.slice(projectsIndexOfFirst, projectsIndexOfLast);
 
   // Load user's company_id
   useEffect(() => {
@@ -121,7 +148,7 @@ export default function BusinessPortal() {
       // Get the student IDs
       const studentIds = shortlistData.map((item) => item.student_id);
 
-      // Then fetch the submission details for those students
+      // Then fetch the student details for those IDs
       const { data: submissions, error: submissionsError } = await supabase
         .from("submissions")
         .select("id, first_name, last_name, school, graduation_year")
@@ -270,12 +297,18 @@ export default function BusinessPortal() {
 
       const projectText = submission.side_projects.trim();
 
-      // Try to extract URL from text (look for http/https links)
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const urls = projectText.match(urlRegex) || [];
-      const projectUrl = urls[0] || undefined;
+      // Use side_project_link from database, fallback to extracting from text
+      let projectUrl = submission.side_project_link || undefined;
 
-      // Remove URLs from description
+      // If no link in database, try to extract URL from text
+      if (!projectUrl) {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const urls = projectText.match(urlRegex) || [];
+        projectUrl = urls[0] || undefined;
+      }
+
+      // Remove URLs from description if they were in the text
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
       let description = projectText.replace(urlRegex, "").trim();
 
       // Try to extract title (first line if it's short, otherwise use default)
@@ -413,7 +446,7 @@ export default function BusinessPortal() {
           query = supabase
             .rpc("search_submissions_ci", { search_term: term })
             .select(
-              "id, first_name, last_name, school, graduation_year, side_projects, skills, github"
+              "id, first_name, last_name, school, graduation_year, side_projects, side_project_link, skills, github"
             )
             .not("side_projects", "is", null)
             .neq("side_projects", "");
@@ -422,7 +455,7 @@ export default function BusinessPortal() {
           query = supabase
             .from("submissions")
             .select(
-              "id, first_name, last_name, school, graduation_year, side_projects, skills, github"
+              "id, first_name, last_name, school, graduation_year, side_projects, side_project_link, skills, github"
             )
             .not("side_projects", "is", null)
             .neq("side_projects", "");
@@ -470,7 +503,7 @@ export default function BusinessPortal() {
       <div className="mb-8">
         {activeTab === "messages" ? (
           // FULL-SCREEN MESSAGES LAYOUT
-          <main className="flex-1 flex justify-center items-start bg-white pt-8">
+          <main className="flex-1 w-full max-w-7xl mx-auto px-4 mt-6">
             <MessagesSection
               initialConversationId={initialConversationId ?? undefined}
               companyId={companyId ?? undefined}
@@ -558,18 +591,19 @@ export default function BusinessPortal() {
                   </div>
                 </div>
                 {activeSubtab === "humble" && (
-                  <div className="flex items-center justify-center">
+                  <>
                     {loadingFlex ? (
-                      <p className="text-gray-500 py-10">
+                      <div className="col-span-2 text-center text-gray-400 py-8">
                         Loading humble flex posts...
-                      </p>
+                      </div>
                     ) : humbleFlexSubmissions.length === 0 ? (
-                      <p className="text-gray-500 py-10">
+                      <div className="col-span-2 text-center text-gray-400 py-8">
                         No humble flex posts yet.
-                      </p>
+                      </div>
                     ) : (
-                      <div className="space-y-6">
-                        {humbleFlexSubmissions.map((submission) => {
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 mb-4">
+                          {currentFlexSubmissions.map((submission) => {
                           const authorName = `${submission.first_name} ${submission.last_name}`;
                           const authorSchool = `${submission.school} '${
                             submission.graduation_year?.slice(-2) || ""
@@ -600,55 +634,175 @@ export default function BusinessPortal() {
                             />
                           );
                         })}
-                      </div>
+                        </div>
+
+                        {/* Pagination Controls for Humble Flex */}
+                        {flexTotalPages > 1 && (
+                          <div className="mt-8 flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => setFlexCurrentPage((prev) => Math.max(prev - 1, 1))}
+                              disabled={flexCurrentPage === 1}
+                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Previous
+                            </button>
+
+                            <div className="flex items-center gap-1">
+                              {Array.from({ length: flexTotalPages }, (_, i) => i + 1).map((page) => {
+                                const showPage =
+                                  page === 1 ||
+                                  page === flexTotalPages ||
+                                  (page >= flexCurrentPage - 1 && page <= flexCurrentPage + 1);
+
+                                const showEllipsis =
+                                  (page === 2 && flexCurrentPage > 3) ||
+                                  (page === flexTotalPages - 1 && flexCurrentPage < flexTotalPages - 2);
+
+                                if (showEllipsis) {
+                                  return (
+                                    <span key={page} className="px-2 text-gray-500">
+                                      ...
+                                    </span>
+                                  );
+                                }
+
+                                if (!showPage) return null;
+
+                                return (
+                                  <button
+                                    key={page}
+                                    onClick={() => setFlexCurrentPage(page)}
+                                    className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                                      flexCurrentPage === page
+                                        ? "bg-brand-blue text-white"
+                                        : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                                    }`}
+                                  >
+                                    {page}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <button
+                              onClick={() => setFlexCurrentPage((prev) => Math.min(prev + 1, flexTotalPages))}
+                              disabled={flexCurrentPage === flexTotalPages}
+                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Next
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
-                  </div>
+                  </>
                 )}
                 {activeSubtab === "projects" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 mb-4">
-                    {projectsLoading ? (
-                      <div className="col-span-2 text-center text-gray-400 py-8">
-                        Loading projects...
-                      </div>
-                    ) : projects.length === 0 ? (
-                      <div className="col-span-2 text-center text-gray-400 py-8">
-                        No projects found.
-                      </div>
-                    ) : (
-                      projects.map((project) => {
-                        const studentProfile: StudentProfile = {
-                          id: project.studentId,
-                          name: project.authorName,
-                          school: project.authorSchool,
-                        };
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 mb-4">
+                      {projectsLoading ? (
+                        <div className="col-span-2 text-center text-gray-400 py-8">
+                          Loading projects...
+                        </div>
+                      ) : projects.length === 0 ? (
+                        <div className="col-span-2 text-center text-gray-400 py-8">
+                          No projects found.
+                        </div>
+                      ) : (
+                        currentProjects.map((project) => {
+                          const studentProfile: StudentProfile = {
+                            id: project.studentId,
+                            name: project.authorName,
+                            school: project.authorSchool,
+                          };
 
-                        return (
-                          <ProjectCard
-                            key={project.id}
-                            title={project.title}
-                            description={project.description}
-                            tags={project.tags}
-                            authorName={project.authorName}
-                            authorSchool={project.authorSchool}
-                            projectImage={project.projectImage}
-                            projectUrl={project.projectUrl}
-                            studentId={project.studentId}
-                            onStartConversation={handleStartConversation}
-                            isShortlisted={shortlist.some(
-                              (s) => s.id === studentProfile.id
-                            )}
-                            onToggleShortlist={() =>
-                              toggleShortlist(studentProfile)
+                          return (
+                            <ProjectCard
+                              key={project.id}
+                              title={project.title}
+                              description={project.description}
+                              tags={project.tags}
+                              authorName={project.authorName}
+                              authorSchool={project.authorSchool}
+                              projectImage={project.projectImage}
+                              projectUrl={project.projectUrl}
+                              studentId={project.studentId}
+                              onStartConversation={handleStartConversation}
+                              isShortlisted={shortlist.some(
+                                (s) => s.id === studentProfile.id
+                              )}
+                              onToggleShortlist={() =>
+                                toggleShortlist(studentProfile)
+                              }
+                            />
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Pagination Controls for Projects */}
+                    {projectsTotalPages > 1 && !projectsLoading && (
+                      <div className="mt-8 flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => setProjectsCurrentPage((prev) => Math.max(prev - 1, 1))}
+                          disabled={projectsCurrentPage === 1}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: projectsTotalPages }, (_, i) => i + 1).map((page) => {
+                            const showPage =
+                              page === 1 ||
+                              page === projectsTotalPages ||
+                              (page >= projectsCurrentPage - 1 && page <= projectsCurrentPage + 1);
+
+                            const showEllipsis =
+                              (page === 2 && projectsCurrentPage > 3) ||
+                              (page === projectsTotalPages - 1 && projectsCurrentPage < projectsTotalPages - 2);
+
+                            if (showEllipsis) {
+                              return (
+                                <span key={page} className="px-2 text-gray-500">
+                                  ...
+                                </span>
+                              );
                             }
-                          />
-                        );
-                      })
+
+                            if (!showPage) return null;
+
+                            return (
+                              <button
+                                key={page}
+                                onClick={() => setProjectsCurrentPage(page)}
+                                className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                                  projectsCurrentPage === page
+                                    ? "bg-brand-blue text-white"
+                                    : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          onClick={() => setProjectsCurrentPage((prev) => Math.min(prev + 1, projectsTotalPages))}
+                          disabled={projectsCurrentPage === projectsTotalPages}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
                 {activeSubtab === "bios" && (
                   <BiosSection
                     searchTerm={searchTerm}
+                    sortOrder={sortOrder}
                     onStartConversation={handleStartConversation}
                     shortlist={shortlist}
                     onToggleShortlist={toggleShortlist}
@@ -664,24 +818,16 @@ export default function BusinessPortal() {
                 {shortlist.length === 0 ? (
                   <p className="text-sm text-gray-500">
                     You haven&apos;t shortlisted any students yet. Click the
-                    flag icon on a student profile to save it here.
+                    bookmark icon on a student profile to save it here.
                   </p>
                 ) : (
-                  <div className="space-y-4">
-                    {shortlist.map((student) => (
-                      <FlexComponent
-                        key={student.id}
-                        authorName={student.name}
-                        authorSchool={student.school}
-                        studentId={student.id}
-                        onStartConversation={handleStartConversation}
-                        isShortlisted={shortlist.some(
-                          (s) => s.id === student.id
-                        )}
-                        onToggleShortlist={() => toggleShortlist(student)}
-                      />
-                    ))}
-                  </div>
+                  <BiosSection
+                    searchTerm=""
+                    shortlist={shortlist}
+                    onStartConversation={handleStartConversation}
+                    onToggleShortlist={toggleShortlist}
+                    filterToShortlist={true}
+                  />
                 )}
               </div>
             )}
