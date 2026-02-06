@@ -24,7 +24,7 @@ export default function LoginPage() {
       console.log("[Login] cleanEmail =", JSON.stringify(cleanEmail));
 
       const { error, redirectTo } = await signInWithEmail(cleanEmail, role);
-      
+
       // Handle redirect case (e.g., student not found -> redirect to form)
       if (redirectTo) {
         navigate(redirectTo, { replace: true });

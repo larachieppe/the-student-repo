@@ -565,36 +565,6 @@ export default function BusinessPortal() {
                       ? "Loading profiles…"
                       : `${profilesCount} profiles`}
                   </div>
-
-                  <div className="flex items-center justify-end gap-4 mb-4">
-                    <div className="relative">
-                      <select
-                        value={sortOrder}
-                        onChange={(e) =>
-                          setSortOrder(e.target.value as "asc" | "desc")
-                        }
-                        className="px-4 py-2 text-sm rounded-lg hover:bg-gray-50 appearance-none pr-8"
-                      >
-                        <option value="asc">Alphabetical</option>
-                        <option value="desc">Recent</option>
-                      </select>
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <svg
-                          className="w-4 h-4 text-gray-500"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
                 </div>
                 {activeSubtab === "humble" && (
                   <>

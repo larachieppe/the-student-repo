@@ -263,13 +263,19 @@ export default function RCPortal() {
       ]);
 
       if (studentResult.error) {
-        console.error("Error loading student accounts count", studentResult.error);
+        console.error(
+          "Error loading student accounts count",
+          studentResult.error
+        );
       } else {
         setStudentAccountCount(studentResult.count ?? 0);
       }
 
       if (businessResult.error) {
-        console.error("Error loading business accounts count", businessResult.error);
+        console.error(
+          "Error loading business accounts count",
+          businessResult.error
+        );
       } else {
         setBusinessAccountCount(businessResult.count ?? 0);
       }
@@ -620,13 +626,17 @@ export default function RCPortal() {
             {/* Stats Section */}
             <div className="flex gap-6 mb-8">
               <div className="flex-1 bg-white border border-gray-200 rounded-2xl p-6">
-                <div className="text-sm text-gray-500 mb-1">Student Accounts</div>
+                <div className="text-sm text-gray-500 mb-1">
+                  Student Accounts
+                </div>
                 <div className="text-3xl font-semibold text-gray-900">
                   {studentAccountCount === null ? "—" : studentAccountCount}
                 </div>
               </div>
               <div className="flex-1 bg-white border border-gray-200 rounded-2xl p-6">
-                <div className="text-sm text-gray-500 mb-1">Business Accounts</div>
+                <div className="text-sm text-gray-500 mb-1">
+                  Business Accounts
+                </div>
                 <div className="text-3xl font-semibold text-gray-900">
                   {businessAccountCount === null ? "—" : businessAccountCount}
                 </div>
