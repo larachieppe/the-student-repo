@@ -7,6 +7,7 @@ import type {
   TabConfig,
   StudentTabKey,
   BusinessTabKey,
+  AdminTabKey,
 } from "../tabTypes";
 
 type NavBarProps = {
@@ -20,6 +21,7 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
   const isHome = pathname === "/";
   const isStudentPortal = pathname === "/student-portal";
   const isBusinessPortal = pathname === "/business-portal";
+  const isAdminPortal = pathname === "/admin-portal";
   const { user, signOut } = useAuth();
 
   const studentTabs: TabConfig<StudentTabKey>[] = [
@@ -35,12 +37,20 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
     { key: "profile", label: "PROFILE" },
   ];
 
+  const adminTabs: TabConfig<AdminTabKey>[] = [
+    { key: "students", label: "STUDENTS" },
+    { key: "accounts", label: "ACCOUNTS" },
+    { key: "analytics", label: "ANALYTICS" },
+  ];
+
   let routeTabs = tabs;
   if (!tabs) {
     if (isStudentPortal) {
       routeTabs = studentTabs;
     } else if (isBusinessPortal) {
       routeTabs = businessTabs;
+    } else if (isAdminPortal) {
+      routeTabs = adminTabs;
     }
   }
 

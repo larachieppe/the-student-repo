@@ -40,6 +40,7 @@ type SubmissionRow = {
   school: string;
   graduation_year: string;
   side_projects: string | null;
+  side_project_link?: string | null;
   skills?: string[] | null;
   github?: string | null;
 };
@@ -68,7 +69,56 @@ export default function RCPortal() {
   const [searchTerm, setSearchTerm] = useState("");
   const [studentAccountCount, setStudentAccountCount] = useState<number | null>(null);
   const [businessAccountCount, setBusinessAccountCount] = useState<number | null>(null);
+  const [totalCompaniesCount, setTotalCompaniesCount] = useState<number | null>(null);
   const { user } = useAuth();
+
+  // Phase 1 Analytics states
+  const [analytics, setAnalytics] = useState({
+    totalShortlists: 0,
+    totalIntroductions: 0,
+    companyActivity: [] as Array<{ companyName: string; conversations: number; shortlists: number }>,
+  });
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  // Accounts management states
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsSearchTerm, setAccountsSearchTerm] = useState("");
+  const [accountsFilter, setAccountsFilter] = useState<"all" | "student" | "business" | "admin">("all");
+  const [deleteConfirm, setDeleteConfirm] = useState<{ accountId: string; email: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Pagination states
+  const [flexCurrentPage, setFlexCurrentPage] = useState(1);
+  const [projectsCurrentPage, setProjectsCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setFlexCurrentPage(1);
+  }, [searchTerm, sortOrder, activeSubtab]);
+
+  useEffect(() => {
+    setProjectsCurrentPage(1);
+  }, [searchTerm, sortOrder, activeSubtab]);
+
+  // Calculate pagination for Humble Flex
+  const flexTotalPages = Math.ceil(humbleFlexSubmissions.length / itemsPerPage);
+  const flexIndexOfLast = flexCurrentPage * itemsPerPage;
+  const flexIndexOfFirst = flexIndexOfLast - itemsPerPage;
+  const currentFlexSubmissions = humbleFlexSubmissions.slice(
+    flexIndexOfFirst,
+    flexIndexOfLast
+  );
+
+  // Calculate pagination for Projects
+  const projectsTotalPages = Math.ceil(projects.length / itemsPerPage);
+  const projectsIndexOfLast = projectsCurrentPage * itemsPerPage;
+  const projectsIndexOfFirst = projectsIndexOfLast - itemsPerPage;
+  const currentProjects = projects.slice(
+    projectsIndexOfFirst,
+    projectsIndexOfLast
+  );
 
   const toggleShortlist = (student: StudentProfile) => {
     setShortlist((current) => {
@@ -124,12 +174,18 @@ export default function RCPortal() {
 
       const projectText = submission.side_projects.trim();
 
-      // Try to extract URL from text (look for http/https links)
+      // Use side_project_link from database, fallback to extracting from text
+      let projectUrl = submission.side_project_link || undefined;
+
+      // If no link in database, try to extract URL from text
+      if (!projectUrl) {
       const urlRegex = /(https?:\/\/[^\s]+)/g;
       const urls = projectText.match(urlRegex) || [];
-      const projectUrl = urls[0] || undefined;
+        projectUrl = urls[0] || undefined;
+      }
 
-      // Remove URLs from description
+      // Remove URLs from description if they were in the text
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
       let description = projectText.replace(urlRegex, "").trim();
 
       // Try to extract title (first line if it's short, otherwise use default)
@@ -192,11 +248,7 @@ export default function RCPortal() {
 
   useEffect(() => {
     const loadAccountCounts = async () => {
-      // Debug: log current user
-      console.log("[DEBUG] Current user:", user);
-      console.log("[DEBUG] User email:", user?.email);
-
-      const [studentResult, businessResult] = await Promise.all([
+      const [studentResult, businessResult, companiesResult] = await Promise.all([
         supabase
           .from("accounts")
           .select("*", { count: "exact" })
@@ -205,11 +257,10 @@ export default function RCPortal() {
           .from("accounts")
           .select("*", { count: "exact" })
           .eq("role", "business"),
+        supabase
+          .from("companies")
+          .select("*", { count: "exact" }),
       ]);
-
-      // Debug: log full results
-      console.log("[DEBUG] Student result:", studentResult);
-      console.log("[DEBUG] Business result:", businessResult);
 
       if (studentResult.error) {
         console.error("Error loading student accounts count", studentResult.error);
@@ -222,10 +273,112 @@ export default function RCPortal() {
       } else {
         setBusinessAccountCount(businessResult.count ?? 0);
       }
+
+      if (companiesResult.error) {
+        console.error("Error loading companies count", companiesResult.error);
+      } else {
+        setTotalCompaniesCount(companiesResult.count ?? 0);
+      }
     };
 
     loadAccountCounts();
   }, [user]);
+
+  // Load Phase 1 Analytics
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      if (activeTab !== "analytics") {
+        return;
+      }
+
+      setAnalyticsLoading(true);
+      try {
+        // Get total shortlists
+        const { count: shortlistCount, error: shortlistError } = await supabase
+          .from("shortlists")
+          .select("*", { count: "exact", head: true });
+
+        // Get total introductions (conversations with company_id and student_id)
+        const { count: introCount, error: introError } = await supabase
+          .from("conversations")
+          .select("*", { count: "exact", head: true })
+          .not("company_id", "is", null)
+          .not("student_id", "is", null);
+
+        // Get company activity (top companies by conversations and shortlists)
+        const { data: conversationsData, error: convDataError } = await supabase
+          .from("conversations")
+          .select("company_id")
+          .not("company_id", "is", null);
+
+        const { data: shortlistsData, error: shortlistDataError } = await supabase
+          .from("shortlists")
+          .select("company_id");
+
+        // Get company names
+        const companyIds = new Set<string>();
+        conversationsData?.forEach((c) => c.company_id && companyIds.add(c.company_id));
+        shortlistsData?.forEach((s) => s.company_id && companyIds.add(s.company_id));
+
+        let companiesMap: { [key: string]: string } = {};
+        if (companyIds.size > 0) {
+          const { data: companies, error: companiesError } = await supabase
+            .from("companies")
+            .select("id, name")
+            .in("id", Array.from(companyIds));
+
+          if (!companiesError && companies) {
+            companiesMap = companies.reduce((acc: any, company: any) => {
+              acc[company.id] = company.name;
+              return acc;
+            }, {});
+          }
+        }
+
+        // Count conversations and shortlists per company
+        const companyStats: { [key: string]: { conversations: number; shortlists: number } } = {};
+        
+        conversationsData?.forEach((c) => {
+          if (c.company_id) {
+            if (!companyStats[c.company_id]) {
+              companyStats[c.company_id] = { conversations: 0, shortlists: 0 };
+            }
+            companyStats[c.company_id].conversations++;
+          }
+        });
+
+        shortlistsData?.forEach((s) => {
+          if (s.company_id) {
+            if (!companyStats[s.company_id]) {
+              companyStats[s.company_id] = { conversations: 0, shortlists: 0 };
+            }
+            companyStats[s.company_id].shortlists++;
+          }
+        });
+
+        const companyActivity = Object.entries(companyStats)
+          .map(([companyId, stats]) => ({
+            companyName: companiesMap[companyId] || "Unknown Company",
+            conversations: stats.conversations,
+            shortlists: stats.shortlists,
+          }))
+          .sort((a, b) => b.conversations - a.conversations)
+          .slice(0, 10); // Top 10 companies
+
+        setAnalytics({
+          totalShortlists: shortlistCount ?? 0,
+          totalIntroductions: introCount ?? 0,
+          companyActivity,
+        });
+      } catch (err) {
+        console.error("Error loading analytics:", err);
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    };
+
+    loadAnalytics();
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeSubtab !== "humble") return;
@@ -308,7 +461,7 @@ export default function RCPortal() {
           query = supabase
             .rpc("search_submissions_ci", { search_term: term })
             .select(
-              "id, first_name, last_name, school, graduation_year, side_projects, skills, github"
+              "id, first_name, last_name, school, graduation_year, side_projects, side_project_link, skills, github"
             )
             .not("side_projects", "is", null)
             .neq("side_projects", "");
@@ -317,7 +470,7 @@ export default function RCPortal() {
           query = supabase
             .from("submissions")
             .select(
-              "id, first_name, last_name, school, graduation_year, side_projects, skills, github"
+              "id, first_name, last_name, school, graduation_year, side_projects, side_project_link, skills, github"
             )
             .not("side_projects", "is", null)
             .neq("side_projects", "");
@@ -359,6 +512,97 @@ export default function RCPortal() {
     loadProjects();
   }, [activeSubtab, sortOrder, searchTerm]);
 
+  // Load accounts for accounts management tab
+  useEffect(() => {
+    const loadAccounts = async () => {
+      if (activeTab !== "accounts") {
+        setAccounts([]);
+        return;
+      }
+
+      setAccountsLoading(true);
+      try {
+        let query = supabase
+          .from("accounts")
+          .select("id, email, role, created_at, company_id");
+
+        // Apply filter
+        if (accountsFilter !== "all") {
+          query = query.eq("role", accountsFilter);
+        }
+
+        // Apply search
+        if (accountsSearchTerm.trim()) {
+          query = query.ilike("email", `%${accountsSearchTerm.trim()}%`);
+        }
+
+        query = query.order("created_at", { ascending: false });
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error("Error loading accounts:", error);
+          setAccounts([]);
+          return;
+        }
+
+        setAccounts(data || []);
+      } catch (err) {
+        console.error("Unexpected error loading accounts:", err);
+        setAccounts([]);
+      } finally {
+        setAccountsLoading(false);
+      }
+    };
+
+    loadAccounts();
+  }, [activeTab, accountsFilter, accountsSearchTerm]);
+
+  // Delete account function
+  const handleDeleteAccount = async (accountId: string) => {
+    if (!deleteConfirm || deleteConfirm.accountId !== accountId) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      // Delete from accounts table
+      // Note: This will delete the account record. If you need to also delete
+      // from auth.users, you may need to set up a database function or use
+      // Supabase Admin API on the server side.
+      const { error: deleteError } = await supabase
+        .from("accounts")
+        .delete()
+        .eq("id", accountId);
+
+      if (deleteError) {
+        console.error("Error deleting account:", deleteError);
+        alert(`Failed to delete account: ${deleteError.message}`);
+        return;
+      }
+
+      // Refresh accounts list
+      setAccounts((prev) => prev.filter((acc) => acc.id !== accountId));
+      
+      // Update counts
+      if (deleteConfirm) {
+        const deletedAccount = accounts.find((acc) => acc.id === accountId);
+        if (deletedAccount?.role === "student") {
+          setStudentAccountCount((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
+        } else if (deletedAccount?.role === "business") {
+          setBusinessAccountCount((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
+        }
+      }
+
+      setDeleteConfirm(null);
+    } catch (err) {
+      console.error("Unexpected error deleting account:", err);
+      alert("An unexpected error occurred while deleting the account.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="flex-1 bg-white font-sans">
       <NavBar activeTab={activeTab} onChangeTab={setActiveTab} />
@@ -385,6 +629,12 @@ export default function RCPortal() {
                 <div className="text-sm text-gray-500 mb-1">Business Accounts</div>
                 <div className="text-3xl font-semibold text-gray-900">
                   {businessAccountCount === null ? "—" : businessAccountCount}
+                </div>
+              </div>
+              <div className="flex-1 bg-white border border-gray-200 rounded-2xl p-6">
+                <div className="text-sm text-gray-500 mb-1">Total Companies</div>
+                <div className="text-3xl font-semibold text-gray-900">
+                  {totalCompaniesCount === null ? "—" : totalCompaniesCount}
                 </div>
               </div>
             </div>
@@ -468,23 +718,24 @@ export default function RCPortal() {
                   </div>
                 </div>
                 {activeSubtab === "humble" && (
-                  <div className="flex items-center justify-center">
+                  <>
                     {loadingFlex ? (
-                      <p className="text-gray-500 py-10">
+                      <div className="col-span-2 text-center text-gray-400 py-8">
                         Loading humble flex posts...
-                      </p>
+                      </div>
                     ) : humbleFlexSubmissions.length === 0 ? (
-                      <p className="text-gray-500 py-10">
+                      <div className="col-span-2 text-center text-gray-400 py-8">
                         No humble flex posts yet.
-                      </p>
+                      </div>
                     ) : (
-                      <div className="space-y-6">
-                        {humbleFlexSubmissions.map((submission) => {
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 mb-4">
+                          {currentFlexSubmissions.map((submission) => {
                           const authorName = `${submission.first_name} ${submission.last_name}`;
                           const authorSchool = `${submission.school} '${
                             submission.graduation_year?.slice(-2) || ""
                           }`;
-                          const studentId = submission.email;
+                            const studentId = submission.id;
 
                           const studentProfile: StudentProfile = {
                             id: studentId,
@@ -511,10 +762,86 @@ export default function RCPortal() {
                           );
                         })}
                       </div>
-                    )}
+
+                        {/* Pagination Controls for Humble Flex */}
+                        {flexTotalPages > 1 && (
+                          <div className="mt-8 flex items-center justify-center gap-2">
+                            <button
+                              onClick={() =>
+                                setFlexCurrentPage((prev) =>
+                                  Math.max(prev - 1, 1)
+                                )
+                              }
+                              disabled={flexCurrentPage === 1}
+                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Previous
+                            </button>
+
+                            <div className="flex items-center gap-1">
+                              {Array.from(
+                                { length: flexTotalPages },
+                                (_, i) => i + 1
+                              ).map((page) => {
+                                const showPage =
+                                  page === 1 ||
+                                  page === flexTotalPages ||
+                                  (page >= flexCurrentPage - 1 &&
+                                    page <= flexCurrentPage + 1);
+
+                                const showEllipsis =
+                                  (page === 2 && flexCurrentPage > 3) ||
+                                  (page === flexTotalPages - 1 &&
+                                    flexCurrentPage < flexTotalPages - 2);
+
+                                if (showEllipsis) {
+                                  return (
+                                    <span
+                                      key={page}
+                                      className="px-2 text-gray-500"
+                                    >
+                                      ...
+                                    </span>
+                                  );
+                                }
+
+                                if (!showPage) return null;
+
+                                return (
+                                  <button
+                                    key={page}
+                                    onClick={() => setFlexCurrentPage(page)}
+                                    className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                                      flexCurrentPage === page
+                                        ? "bg-brand-blue text-white"
+                                        : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                                    }`}
+                                  >
+                                    {page}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <button
+                              onClick={() =>
+                                setFlexCurrentPage((prev) =>
+                                  Math.min(prev + 1, flexTotalPages)
+                                )
+                              }
+                              disabled={flexCurrentPage === flexTotalPages}
+                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Next
+                            </button>
                   </div>
+                        )}
+                      </>
+                    )}
+                  </>
                 )}
                 {activeSubtab === "projects" && (
+                  <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 mb-4">
                     {projectsLoading ? (
                       <div className="col-span-2 text-center text-gray-400 py-8">
@@ -525,7 +852,14 @@ export default function RCPortal() {
                         No projects found.
                       </div>
                     ) : (
-                      projects.map((project) => (
+                        currentProjects.map((project) => {
+                          const studentProfile: StudentProfile = {
+                            id: project.studentId,
+                            name: project.authorName,
+                            school: project.authorSchool,
+                          };
+
+                          return (
                         <ProjectCard
                           key={project.id}
                           title={project.title}
@@ -537,45 +871,332 @@ export default function RCPortal() {
                           projectUrl={project.projectUrl}
                           studentId={project.studentId}
                           onStartConversation={handleStartConversation}
-                        />
-                      ))
-                    )}
+                              isShortlisted={shortlist.some(
+                                (s) => s.id === studentProfile.id
+                              )}
+                              onToggleShortlist={() =>
+                                toggleShortlist(studentProfile)
+                              }
+                            />
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Pagination Controls for Projects */}
+                    {projectsTotalPages > 1 && !projectsLoading && (
+                      <div className="mt-8 flex items-center justify-center gap-2">
+                        <button
+                          onClick={() =>
+                            setProjectsCurrentPage((prev) =>
+                              Math.max(prev - 1, 1)
+                            )
+                          }
+                          disabled={projectsCurrentPage === 1}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          {Array.from(
+                            { length: projectsTotalPages },
+                            (_, i) => i + 1
+                          ).map((page) => {
+                            const showPage =
+                              page === 1 ||
+                              page === projectsTotalPages ||
+                              (page >= projectsCurrentPage - 1 &&
+                                page <= projectsCurrentPage + 1);
+
+                            const showEllipsis =
+                              (page === 2 && projectsCurrentPage > 3) ||
+                              (page === projectsTotalPages - 1 &&
+                                projectsCurrentPage < projectsTotalPages - 2);
+
+                            if (showEllipsis) {
+                              return (
+                                <span key={page} className="px-2 text-gray-500">
+                                  ...
+                                </span>
+                              );
+                            }
+
+                            if (!showPage) return null;
+
+                            return (
+                              <button
+                                key={page}
+                                onClick={() => setProjectsCurrentPage(page)}
+                                className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                                  projectsCurrentPage === page
+                                    ? "bg-brand-blue text-white"
+                                    : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          onClick={() =>
+                            setProjectsCurrentPage((prev) =>
+                              Math.min(prev + 1, projectsTotalPages)
+                            )
+                          }
+                          disabled={projectsCurrentPage === projectsTotalPages}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
                   </div>
+                    )}
+                  </>
                 )}
                 {activeSubtab === "bios" && (
                   <BiosSection
                     searchTerm={searchTerm}
+                    sortOrder={sortOrder}
                     onStartConversation={handleStartConversation}
+                    shortlist={shortlist}
+                    onToggleShortlist={toggleShortlist}
                   />
                 )}
               </>
             )}
 
-            {activeTab === "shortlist" && (
+            {activeTab === "accounts" && (
               <div>
-                <h1 className="text-xl font-semibold mb-4">Shortlist</h1>
+                <div className="flex justify-between items-center mb-6">
+                  <h1 className="text-xl font-semibold">Account Management</h1>
+                </div>
 
-                {shortlist.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    You haven&apos;t shortlisted any students yet. Click the
-                    flag icon on a student profile to save it here.
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {shortlist.map((student) => (
-                      <FlexComponent
-                        key={student.id}
-                        authorName={student.name}
-                        authorSchool={student.school}
-                        studentId={student.id}
-                        onStartConversation={handleStartConversation}
-                        isShortlisted={shortlist.some(
-                          (s) => s.id === student.id
-                        )}
-                        onToggleShortlist={() => toggleShortlist(student)}
+                {/* Search and Filter */}
+                <div className="flex gap-4 mb-6">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      placeholder="Search by email..."
+                      value={accountsSearchTerm}
+                      onChange={(e) => setAccountsSearchTerm(e.target.value)}
+                      className="flex font-sans text-sm items-center w-full px-4 py-1.5 gap-2 text-black rounded-xl border border-gray-300 focus:border-brand-blue hover:bg-brand-blue/5 transition"
+                    />
+                    <svg
+                      className="w-4 h-4 text-brand-blue absolute right-3 top-1/2 transform -translate-y-1/2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                       />
-                    ))}
+                    </svg>
                   </div>
+                  <select
+                    value={accountsFilter}
+                    onChange={(e) =>
+                      setAccountsFilter(
+                        e.target.value as "all" | "student" | "business" | "admin"
+                      )
+                    }
+                    className="px-4 py-1.5 text-sm rounded-xl border border-gray-300 hover:bg-gray-50 appearance-none pr-8"
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="student">Students</option>
+                    <option value="business">Business</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+
+                {/* Accounts List */}
+                {accountsLoading ? (
+                  <div className="text-center text-gray-400 py-8">
+                    Loading accounts...
+                  </div>
+                ) : accounts.length === 0 ? (
+                  <div className="text-center text-gray-400 py-8">
+                    No accounts found.
+                  </div>
+                ) : (
+                  <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Email
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Role
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Created
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {accounts.map((account) => (
+                          <tr key={account.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {account.email}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span
+                                className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  account.role === "admin"
+                                    ? "bg-purple-100 text-purple-800"
+                                    : account.role === "business"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-green-100 text-green-800"
+                                }`}
+                              >
+                                {account.role}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {account.created_at
+                                ? new Date(account.created_at).toLocaleDateString()
+                                : "—"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <button
+                                onClick={() =>
+                                  setDeleteConfirm({
+                                    accountId: account.id,
+                                    email: account.email,
+                                  })
+                                }
+                                className="text-red-600 hover:text-red-900"
+                                disabled={account.id === user?.id}
+                              >
+                                {account.id === user?.id ? (
+                                  <span className="text-gray-400 cursor-not-allowed">
+                                    Current User
+                                  </span>
+                                ) : (
+                                  "Delete"
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Delete Confirmation Modal */}
+                {deleteConfirm && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+                      <h2 className="text-xl font-semibold mb-4">
+                        Confirm Deletion
+                      </h2>
+                      <p className="text-gray-600 mb-6">
+                        Are you sure you want to delete the account for{" "}
+                        <strong>{deleteConfirm.email}</strong>? This action
+                        cannot be undone.
+                      </p>
+                      <div className="flex gap-3 justify-end">
+                        <button
+                          onClick={() => setDeleteConfirm(null)}
+                          disabled={deleting}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAccount(deleteConfirm.accountId)}
+                          disabled={deleting}
+                          className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {deleting ? "Deleting..." : "Delete Account"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "analytics" && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h1 className="text-xl font-semibold">Analytics & Insights</h1>
+                </div>
+
+                {analyticsLoading ? (
+                  <div className="text-center text-gray-400 py-8">
+                    Loading analytics...
+                  </div>
+                ) : (
+                  <>
+                    {/* Key Metrics Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                      <div className="bg-white border border-gray-200 rounded-2xl p-6">
+                        <div className="text-sm text-gray-500 mb-1">Total Introductions</div>
+                        <div className="text-3xl font-semibold text-gray-900">
+                          {analytics.totalIntroductions}
+                        </div>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-2xl p-6">
+                        <div className="text-sm text-gray-500 mb-1">Total Shortlists</div>
+                        <div className="text-3xl font-semibold text-gray-900">
+                          {analytics.totalShortlists}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Company Activity */}
+                    <div className="bg-white border border-gray-200 rounded-2xl p-6">
+                      <h2 className="text-lg font-semibold mb-4">Top Companies by Activity</h2>
+                      {analytics.companyActivity.length === 0 ? (
+                        <div className="text-center text-gray-400 py-8">
+                          No company activity data yet.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Company
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Conversations
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Shortlists
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {analytics.companyActivity.map((company, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {company.companyName}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {company.conversations}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {company.shortlists}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                  </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             )}
