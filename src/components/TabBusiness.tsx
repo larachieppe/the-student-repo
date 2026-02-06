@@ -5,6 +5,7 @@ const tabDefs = [
   { key: "students", label: "STUDENTS" },
   { key: "shortlist", label: "SHORTLIST" },
   { key: "messages", label: "MESSAGES" },
+  { key: "profile", label: "PROFILE" },
 ] as const;
 
 export type TabKey = BusinessTabKey;

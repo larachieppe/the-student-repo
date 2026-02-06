@@ -8,6 +8,7 @@ import FlexComponent from "../components/FlexComponent";
 import ProjectCard from "../components/ProjectComponent";
 import BiosSection from "../components/BioSection";
 import MessagesSection from "../components/ConversationComponent";
+import CompanyProfile from "../components/CompanyProfile";
 import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
 
@@ -864,6 +865,10 @@ export default function BusinessPortal() {
                   />
                 )}
               </div>
+            )}
+
+            {activeTab === "profile" && companyId && (
+              <CompanyProfile companyId={companyId} />
             )}
           </main>
         )}

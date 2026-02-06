@@ -1,5 +1,5 @@
 export type StudentTabKey = "companies" | "profile" | "messages";
-export type BusinessTabKey = "students" | "shortlist" | "messages";
+export type BusinessTabKey = "students" | "shortlist" | "messages" | "profile";
 
 // All possible tab keys in the navbar:
 export type TabKey = StudentTabKey | BusinessTabKey;
