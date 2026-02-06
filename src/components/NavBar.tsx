@@ -48,6 +48,13 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 border-b bg-white border-brand-line/60 backdrop-blur">
       <nav className="container-tight flex h-16 items-center justify-between">
@@ -78,18 +85,30 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
         {/* center content */}
         {isHome && (
           <div className="hidden gap-6 text-sm text-brand-sub md:flex">
-            <a href="#about" className="hover:text-brand-text">
+            <button
+              onClick={() => scrollToSection("about")}
+              className="hover:text-brand-text"
+            >
               About
-            </a>
-            <a href="#partners" className="hover:text-brand-text">
+            </button>
+            <button
+              onClick={() => scrollToSection("partners")}
+              className="hover:text-brand-text"
+            >
               Companies
-            </a>
-            <a href="#newsletter" className="hover:text-brand-text">
+            </button>
+            <button
+              onClick={() => scrollToSection("newsletter")}
+              className="hover:text-brand-text"
+            >
               Newsletter
-            </a>
-            <a href="#faq" className="hover:text-brand-text">
+            </button>
+            <button
+              onClick={() => scrollToSection("faq")}
+              className="hover:text-brand-text"
+            >
               FAQ
-            </a>
+            </button>
           </div>
         )}
 

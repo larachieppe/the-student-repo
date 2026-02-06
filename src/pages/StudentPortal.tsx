@@ -5,6 +5,7 @@ import FlexComponent from "../components/FlexComponent";
 import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
 import MessagesSection from "../components/ConversationComponent";
+import CompanyDetailModal from "../components/CompanyDetailModal";
 
 interface HumbleFlexSubmission {
   id: string;
@@ -21,6 +22,19 @@ type CompanyRow = {
   id: string;
   name: string | null;
   url: string | null;
+  logo_url: string | null;
+  description: string | null;
+  company_type: string | null;
+  industry: string | null;
+  company_size: string | null;
+  location: string | null;
+  remote_policy: string | null;
+  open_roles: string | null;
+  hiring_needs: string | null;
+  candidate_requirements: string | null;
+  tech_stack: string[] | null;
+  perks: string | null;
+  is_hiring: boolean | null;
 };
 
 type ProfileRow = {
@@ -83,6 +97,9 @@ export default function StudentPortal() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<CompanyRow | null>(null);
+  const [companiesCurrentPage, setCompaniesCurrentPage] = useState(1);
+  const companiesPerPage = 12;
 
   const openExternalLink = (url?: string) => {
     if (!url) return;
@@ -97,6 +114,7 @@ export default function StudentPortal() {
   const [studentId, setStudentId] = useState<string | null>(null);
 
   const [profile, setProfile] = useState({
+    profilePictureUrl: "",
     fullName: "",
     major: "",
     school: "",
@@ -228,11 +246,11 @@ export default function StudentPortal() {
       const row = data as ProfileRow;
 
       setProfile({
+        profilePictureUrl: row.profile_picture_url ?? "",
         fullName: `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim(),
         major: row.major ?? "",
         school: row.school ?? "",
         gradYear: row.graduation_year ?? "",
-        location: "",
         workType: (row.type_of_work ?? []).join(", "),
         relocating: row.relocating ?? "",
         skills: row.skills ?? [],
@@ -253,7 +271,9 @@ export default function StudentPortal() {
       try {
         const { data, error } = await supabase
           .from("companies")
-          .select("id,name,url")
+          .select(
+            "id,name,url,logo_url,description,company_type,industry,company_size,location,remote_policy,open_roles,hiring_needs,candidate_requirements,tech_stack,perks,is_hiring"
+          )
           .order("name", { ascending: true });
 
         // IMPORTANT: log the error so you can see it in console
@@ -396,11 +416,110 @@ export default function StudentPortal() {
               ) : companies.length === 0 ? (
                 <p className="text-gray-500 py-6">No companies found.</p>
               ) : (
-                <div className="space-y-4">
-                  {companies.map((company) => (
-                    <CompanyCard key={company.id} company={company} />
-                  ))}
-                </div>
+                <>
+                  {/* Companies Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {companies
+                      .slice(
+                        (companiesCurrentPage - 1) * companiesPerPage,
+                        companiesCurrentPage * companiesPerPage
+                      )
+                      .map((company) => (
+                        <CompanyCard
+                          key={company.id}
+                          company={company}
+                          onClick={() => setSelectedCompany(company)}
+                        />
+                      ))}
+                  </div>
+
+                  {/* Pagination */}
+                  {companies.length > companiesPerPage && (
+                    <div className="mt-6 flex items-center justify-center gap-2">
+                      <button
+                        onClick={() =>
+                          setCompaniesCurrentPage((prev) =>
+                            Math.max(prev - 1, 1)
+                          )
+                        }
+                        disabled={companiesCurrentPage === 1}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        {Array.from(
+                          {
+                            length: Math.ceil(
+                              companies.length / companiesPerPage
+                            ),
+                          },
+                          (_, i) => i + 1
+                        ).map((page) => {
+                          const totalPages = Math.ceil(
+                            companies.length / companiesPerPage
+                          );
+                          const showPage =
+                            page === 1 ||
+                            page === totalPages ||
+                            (page >= companiesCurrentPage - 1 &&
+                              page <= companiesCurrentPage + 1);
+
+                          const showEllipsis =
+                            (page === 2 && companiesCurrentPage > 3) ||
+                            (page === totalPages - 1 &&
+                              companiesCurrentPage < totalPages - 2);
+
+                          if (showEllipsis) {
+                            return (
+                              <span
+                                key={page}
+                                className="px-2 text-gray-500"
+                              >
+                                ...
+                              </span>
+                            );
+                          }
+
+                          if (!showPage) return null;
+
+                          return (
+                            <button
+                              key={page}
+                              onClick={() => setCompaniesCurrentPage(page)}
+                              className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                                companiesCurrentPage === page
+                                  ? "bg-brand-blue text-white"
+                                  : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          setCompaniesCurrentPage((prev) =>
+                            Math.min(
+                              prev + 1,
+                              Math.ceil(companies.length / companiesPerPage)
+                            )
+                          )
+                        }
+                        disabled={
+                          companiesCurrentPage ===
+                          Math.ceil(companies.length / companiesPerPage)
+                        }
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -435,6 +554,15 @@ export default function StudentPortal() {
               {/* LEFT: Profile sidebar */}
               <aside className="bg-white border border-gray-200 rounded-2xl p-6 h-fit sticky top-6 ml-2">
                 <div className="flex flex-col items-center text-center">
+                  {profile.profilePictureUrl ? (
+                    <img
+                      src={profile.profilePictureUrl}
+                      alt="Profile"
+                      className="w-28 h-28 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-28 h-28 rounded-full bg-gray-100 border border-gray-200" />
+                  )}
                   {profile.fullName ? (
                     <h2 className="mt-4 text-2xl font-semibold text-gray-900">
                       {profile.fullName}
@@ -828,29 +956,112 @@ export default function StudentPortal() {
           </div>
         </div>
       ) : null}
+
+      {/* Company Detail Modal */}
+      {selectedCompany && (
+        <CompanyDetailModal
+          company={selectedCompany}
+          onClose={() => setSelectedCompany(null)}
+        />
+      )}
     </div>
   );
 }
 
-function CompanyCard({ company }: { company: CompanyRow }) {
+function CompanyCard({
+  company,
+  onClick,
+}: {
+  company: CompanyRow;
+  onClick: () => void;
+}) {
+  const firstThreeSkills = company.tech_stack?.slice(0, 3) || [];
   const companyUrl = normalizeUrl(company.url);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h4 className="text-lg font-semibold text-gray-900">
-            {company.name}
-          </h4>
+    <div className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-brand-blue/30 transition">
+      <div className="flex items-start gap-3">
+        {/* Logo */}
+        <div
+          onClick={onClick}
+          className="cursor-pointer"
+        >
+          {company.logo_url ? (
+            <img
+              src={company.logo_url}
+              alt={`${company.name} logo`}
+              className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+              <span className="text-lg font-semibold text-gray-500">
+                {company.name?.charAt(0) || "C"}
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Content */}
+        <div
+          onClick={onClick}
+          className="flex-1 min-w-0 cursor-pointer"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="text-base font-semibold text-gray-900 truncate">
+              {company.name}
+            </h4>
+            {company.is_hiring && (
+              <span className="flex-shrink-0 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                Hiring
+              </span>
+            )}
+          </div>
+
+          {/* Meta info */}
+          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+            {company.industry && <span>{company.industry}</span>}
+            {company.industry && company.remote_policy && (
+              <span>•</span>
+            )}
+            {company.remote_policy && <span>{company.remote_policy}</span>}
+          </div>
+
+          {/* Description preview */}
+          {company.description && (
+            <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+              {company.description}
+            </p>
+          )}
+
+          {/* Tech stack tags */}
+          {firstThreeSkills.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {firstThreeSkills.map((skill, idx) => (
+                <span
+                  key={idx}
+                  className="px-2 py-0.5 bg-brand-blue/10 text-brand-blue text-xs rounded"
+                >
+                  {skill}
+                </span>
+              ))}
+              {company.tech_stack && company.tech_stack.length > 3 && (
+                <span className="px-2 py-0.5 text-gray-400 text-xs">
+                  +{company.tech_stack.length - 3} more
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Visit Button - Right Side */}
+        <div className="flex-shrink-0">
           {companyUrl ? (
             <button
-              onClick={() =>
-                window.open(companyUrl, "_blank", "noopener,noreferrer")
-              }
-              className="px-4 py-2 text-sm font-medium rounded-xl border border-brand-blue hover:bg-brand-blue/5 transition"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(companyUrl, "_blank", "noopener,noreferrer");
+              }}
+              className="px-4 py-2 text-sm font-medium rounded-xl border border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white transition"
             >
               Visit
             </button>
@@ -862,10 +1073,6 @@ function CompanyCard({ company }: { company: CompanyRow }) {
               No site
             </button>
           )}
-
-          <div className="h-10 w-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center">
-            🏢
-          </div>
         </div>
       </div>
     </div>
