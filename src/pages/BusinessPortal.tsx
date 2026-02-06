@@ -95,13 +95,19 @@ export default function BusinessPortal() {
   const flexTotalPages = Math.ceil(humbleFlexSubmissions.length / itemsPerPage);
   const flexIndexOfLast = flexCurrentPage * itemsPerPage;
   const flexIndexOfFirst = flexIndexOfLast - itemsPerPage;
-  const currentFlexSubmissions = humbleFlexSubmissions.slice(flexIndexOfFirst, flexIndexOfLast);
+  const currentFlexSubmissions = humbleFlexSubmissions.slice(
+    flexIndexOfFirst,
+    flexIndexOfLast
+  );
 
   // Calculate pagination for Projects
   const projectsTotalPages = Math.ceil(projects.length / itemsPerPage);
   const projectsIndexOfLast = projectsCurrentPage * itemsPerPage;
   const projectsIndexOfFirst = projectsIndexOfLast - itemsPerPage;
-  const currentProjects = projects.slice(projectsIndexOfFirst, projectsIndexOfLast);
+  const currentProjects = projects.slice(
+    projectsIndexOfFirst,
+    projectsIndexOfLast
+  );
 
   // Load user's company_id
   useEffect(() => {
@@ -201,12 +207,10 @@ export default function BusinessPortal() {
       setShortlist((current) => current.filter((s) => s.id !== student.id));
     } else {
       // Add to database
-      const { error } = await supabase
-        .from("shortlists")
-        .insert({
-          company_id: companyId,
-          student_id: student.id,
-        });
+      const { error } = await supabase.from("shortlists").insert({
+        company_id: companyId,
+        student_id: student.id,
+      });
 
       if (error) {
         console.error("Error adding to shortlist:", error);
@@ -506,6 +510,7 @@ export default function BusinessPortal() {
           // FULL-SCREEN MESSAGES LAYOUT
           <main className="flex-1 w-full max-w-7xl mx-auto px-4 mt-6">
             <MessagesSection
+              role="business"
               initialConversationId={initialConversationId ?? undefined}
               companyId={companyId ?? undefined}
             />
@@ -605,43 +610,47 @@ export default function BusinessPortal() {
                       <>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 mb-4">
                           {currentFlexSubmissions.map((submission) => {
-                          const authorName = `${submission.first_name} ${submission.last_name}`;
-                          const authorSchool = `${submission.school} '${
-                            submission.graduation_year?.slice(-2) || ""
-                          }`;
-                          const studentId = submission.id;
+                            const authorName = `${submission.first_name} ${submission.last_name}`;
+                            const authorSchool = `${submission.school} '${
+                              submission.graduation_year?.slice(-2) || ""
+                            }`;
+                            const studentId = submission.id;
 
-                          const studentProfile: StudentProfile = {
-                            id: studentId,
-                            name: authorName,
-                            school: authorSchool,
-                          };
+                            const studentProfile: StudentProfile = {
+                              id: studentId,
+                              name: authorName,
+                              school: authorSchool,
+                            };
 
-                          return (
-                            <FlexComponent
-                              key={submission.id}
-                              authorName={authorName}
-                              authorSchool={authorSchool}
-                              flexContent={submission.flex}
-                              skills={submission.skills || []}
-                              studentId={studentId}
-                              onStartConversation={handleStartConversation}
-                              isShortlisted={shortlist.some(
-                                (s) => s.id === studentProfile.id
-                              )}
-                              onToggleShortlist={() =>
-                                toggleShortlist(studentProfile)
-                              }
-                            />
-                          );
-                        })}
+                            return (
+                              <FlexComponent
+                                key={submission.id}
+                                authorName={authorName}
+                                authorSchool={authorSchool}
+                                flexContent={submission.flex}
+                                skills={submission.skills || []}
+                                studentId={studentId}
+                                onStartConversation={handleStartConversation}
+                                isShortlisted={shortlist.some(
+                                  (s) => s.id === studentProfile.id
+                                )}
+                                onToggleShortlist={() =>
+                                  toggleShortlist(studentProfile)
+                                }
+                              />
+                            );
+                          })}
                         </div>
 
                         {/* Pagination Controls for Humble Flex */}
                         {flexTotalPages > 1 && (
                           <div className="mt-8 flex items-center justify-center gap-2">
                             <button
-                              onClick={() => setFlexCurrentPage((prev) => Math.max(prev - 1, 1))}
+                              onClick={() =>
+                                setFlexCurrentPage((prev) =>
+                                  Math.max(prev - 1, 1)
+                                )
+                              }
                               disabled={flexCurrentPage === 1}
                               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -649,19 +658,27 @@ export default function BusinessPortal() {
                             </button>
 
                             <div className="flex items-center gap-1">
-                              {Array.from({ length: flexTotalPages }, (_, i) => i + 1).map((page) => {
+                              {Array.from(
+                                { length: flexTotalPages },
+                                (_, i) => i + 1
+                              ).map((page) => {
                                 const showPage =
                                   page === 1 ||
                                   page === flexTotalPages ||
-                                  (page >= flexCurrentPage - 1 && page <= flexCurrentPage + 1);
+                                  (page >= flexCurrentPage - 1 &&
+                                    page <= flexCurrentPage + 1);
 
                                 const showEllipsis =
                                   (page === 2 && flexCurrentPage > 3) ||
-                                  (page === flexTotalPages - 1 && flexCurrentPage < flexTotalPages - 2);
+                                  (page === flexTotalPages - 1 &&
+                                    flexCurrentPage < flexTotalPages - 2);
 
                                 if (showEllipsis) {
                                   return (
-                                    <span key={page} className="px-2 text-gray-500">
+                                    <span
+                                      key={page}
+                                      className="px-2 text-gray-500"
+                                    >
                                       ...
                                     </span>
                                   );
@@ -686,7 +703,11 @@ export default function BusinessPortal() {
                             </div>
 
                             <button
-                              onClick={() => setFlexCurrentPage((prev) => Math.min(prev + 1, flexTotalPages))}
+                              onClick={() =>
+                                setFlexCurrentPage((prev) =>
+                                  Math.min(prev + 1, flexTotalPages)
+                                )
+                              }
                               disabled={flexCurrentPage === flexTotalPages}
                               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -745,7 +766,11 @@ export default function BusinessPortal() {
                     {projectsTotalPages > 1 && !projectsLoading && (
                       <div className="mt-8 flex items-center justify-center gap-2">
                         <button
-                          onClick={() => setProjectsCurrentPage((prev) => Math.max(prev - 1, 1))}
+                          onClick={() =>
+                            setProjectsCurrentPage((prev) =>
+                              Math.max(prev - 1, 1)
+                            )
+                          }
                           disabled={projectsCurrentPage === 1}
                           className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -753,15 +778,20 @@ export default function BusinessPortal() {
                         </button>
 
                         <div className="flex items-center gap-1">
-                          {Array.from({ length: projectsTotalPages }, (_, i) => i + 1).map((page) => {
+                          {Array.from(
+                            { length: projectsTotalPages },
+                            (_, i) => i + 1
+                          ).map((page) => {
                             const showPage =
                               page === 1 ||
                               page === projectsTotalPages ||
-                              (page >= projectsCurrentPage - 1 && page <= projectsCurrentPage + 1);
+                              (page >= projectsCurrentPage - 1 &&
+                                page <= projectsCurrentPage + 1);
 
                             const showEllipsis =
                               (page === 2 && projectsCurrentPage > 3) ||
-                              (page === projectsTotalPages - 1 && projectsCurrentPage < projectsTotalPages - 2);
+                              (page === projectsTotalPages - 1 &&
+                                projectsCurrentPage < projectsTotalPages - 2);
 
                             if (showEllipsis) {
                               return (
@@ -790,7 +820,11 @@ export default function BusinessPortal() {
                         </div>
 
                         <button
-                          onClick={() => setProjectsCurrentPage((prev) => Math.min(prev + 1, projectsTotalPages))}
+                          onClick={() =>
+                            setProjectsCurrentPage((prev) =>
+                              Math.min(prev + 1, projectsTotalPages)
+                            )
+                          }
                           disabled={projectsCurrentPage === projectsTotalPages}
                           className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >

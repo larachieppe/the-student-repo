@@ -4,6 +4,7 @@ import type { TabKey } from "../tabTypes";
 import FlexComponent from "../components/FlexComponent";
 import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
+import MessagesSection from "../components/ConversationComponent";
 
 interface HumbleFlexSubmission {
   id: string;
@@ -19,6 +20,7 @@ interface HumbleFlexSubmission {
 type CompanyRow = {
   id: string;
   name: string | null;
+  url: string | null;
 };
 
 type ProfileRow = {
@@ -38,11 +40,38 @@ type ProfileRow = {
   side_project_link: string | null;
 };
 
+const openExternalLink = (raw?: string | null) => {
+  const normalized = normalizeUrl(raw);
+  if (!normalized) return;
+  window.open(normalized, "_blank", "noopener,noreferrer");
+};
+
+const normalizeUrl = (raw?: string | null) => {
+  const value = (raw ?? "").trim();
+  if (!value) return null;
+
+  // If user saved "example.com", add scheme
+  const withScheme =
+    value.startsWith("http://") || value.startsWith("https://")
+      ? value
+      : `https://${value}`;
+
+  try {
+    const url = new URL(withScheme);
+
+    // Only allow http(s)
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+};
+
 export default function StudentPortal() {
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
-
   const [humbleFlexSubmissions, setHumbleFlexSubmissions] = useState<
     HumbleFlexSubmission[]
   >([]);
@@ -65,14 +94,13 @@ export default function StudentPortal() {
 
     window.open(normalized, "_blank", "noopener,noreferrer");
   };
+  const [studentId, setStudentId] = useState<string | null>(null);
 
   const [profile, setProfile] = useState({
-    profilePictureUrl: "",
     fullName: "",
     major: "",
     school: "",
     gradYear: "",
-    location: "",
     workType: "",
     relocating: "",
     skills: [] as string[],
@@ -156,6 +184,30 @@ export default function StudentPortal() {
   useEffect(() => {
     if (!email) return;
 
+    const loadStudentId = async () => {
+      const { data, error } = await supabase
+        .from("submissions")
+        .select("id")
+        .eq("email", email)
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.error("Error loading student ID:", error);
+        return;
+      }
+
+      if (data) {
+        setStudentId(data.id);
+      }
+    };
+
+    loadStudentId();
+  }, [email]);
+
+  useEffect(() => {
+    if (!email) return;
+
     const loadProfileFromSubmissions = async () => {
       const { data, error } = await supabase
         .from("submissions")
@@ -163,7 +215,9 @@ export default function StudentPortal() {
           "first_name,last_name,major,school,graduation_year,skills,flex,github,linkedin,type_of_work,profile_picture_url,relocating,side_projects,side_project_link"
         )
         .eq("email", email)
-        .maybeSingle();
+        .limit(1)
+        .single();
+      console.log("loadProfileFromSubmissions:", { data, error, email });
 
       if (error) {
         console.error("Error loading profile from submissions:", error);
@@ -174,7 +228,6 @@ export default function StudentPortal() {
       const row = data as ProfileRow;
 
       setProfile({
-        profilePictureUrl: row.profile_picture_url ?? "",
         fullName: `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim(),
         major: row.major ?? "",
         school: row.school ?? "",
@@ -200,7 +253,7 @@ export default function StudentPortal() {
       try {
         const { data, error } = await supabase
           .from("companies")
-          .select("id,name")
+          .select("id,name,url")
           .order("name", { ascending: true });
 
         // IMPORTANT: log the error so you can see it in console
@@ -382,15 +435,6 @@ export default function StudentPortal() {
               {/* LEFT: Profile sidebar */}
               <aside className="bg-white border border-gray-200 rounded-2xl p-6 h-fit sticky top-6 ml-2">
                 <div className="flex flex-col items-center text-center">
-                  {profile.profilePictureUrl ? (
-                    <img
-                      src={profile.profilePictureUrl}
-                      alt="Profile"
-                      className="w-28 h-28 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-28 h-28 rounded-full bg-gray-100 border border-gray-200" />
-                  )}
                   {profile.fullName ? (
                     <h2 className="mt-4 text-2xl font-semibold text-gray-900">
                       {profile.fullName}
@@ -423,7 +467,7 @@ export default function StudentPortal() {
                   <button
                     onClick={() => openExternalLink(profile.github)}
                     disabled={!profile.github}
-                    className="w-full rounded-xl border border-gray-300 py-2 text-sm font-medium transition
+                    className="w-full rounded-xl border border-brand-blue py-2 text-sm font-medium transition
       hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     GitHub
@@ -432,7 +476,7 @@ export default function StudentPortal() {
                   <button
                     onClick={() => openExternalLink(profile.linkedin)}
                     disabled={!profile.linkedin}
-                    className="w-full rounded-xl border border-gray-300 py-2 text-sm font-medium transition
+                    className="w-full rounded-xl border border-brand-blue py-2 text-sm font-medium transition
       hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     LinkedIn
@@ -527,15 +571,12 @@ export default function StudentPortal() {
           </>
         )}
         {activeTab === "messages" && (
-          <>
-            <div className="mx-2 mt-6">
-              <div className="bg-white border border-gray-200 rounded-2xl p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                  Messages
-                </h3>
-              </div>
-            </div>
-          </>
+          <div className="mx-2 mt-6">
+            <MessagesSection
+              role="student"
+              studentId={studentId ?? undefined}
+            />
+          </div>
         )}
       </div>
       {isEditOpen ? (
@@ -792,17 +833,39 @@ export default function StudentPortal() {
 }
 
 function CompanyCard({ company }: { company: CompanyRow }) {
+  const companyUrl = normalizeUrl(company.url);
+
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h4 className="text-lg font-semibold text-gray-900">
             {company.name}
           </h4>
         </div>
 
-        <div className="h-10 w-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center">
-          🏢
+        <div className="flex items-center gap-3">
+          {companyUrl ? (
+            <button
+              onClick={() =>
+                window.open(companyUrl, "_blank", "noopener,noreferrer")
+              }
+              className="px-4 py-2 text-sm font-medium rounded-xl border border-brand-blue hover:bg-brand-blue/5 transition"
+            >
+              Visit
+            </button>
+          ) : (
+            <button
+              disabled
+              className="px-4 py-2 text-sm font-medium rounded-xl border border-gray-200 text-gray-400 cursor-not-allowed"
+            >
+              No site
+            </button>
+          )}
+
+          <div className="h-10 w-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center">
+            🏢
+          </div>
         </div>
       </div>
     </div>
