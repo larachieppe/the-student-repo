@@ -9,6 +9,7 @@ import ProjectCard from "../components/ProjectComponent";
 import BiosSection from "../components/BioSection";
 import MessagesSection from "../components/ConversationComponent";
 import CompanyProfile from "../components/CompanyProfile";
+import PipelineKanban from "../components/PipelineKanban";
 import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
 
@@ -61,7 +62,7 @@ type StudentProfile = {
 export default function BusinessPortal() {
   const { activeTab, setActiveTab } = useOutletContext<OutletContext>();
   const [activeSubtab, setActiveSubtab] = useState<SubtabKey>("humble");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortOrder] = useState<"asc" | "desc">("asc");
   const [profilesCount, setProfilesCount] = useState<number | null>(null);
   const [humbleFlexSubmissions, setHumbleFlexSubmissions] = useState<
     HumbleFlexSubmission[]
@@ -76,6 +77,7 @@ export default function BusinessPortal() {
   const [searchTerm, setSearchTerm] = useState("");
   const [companyId, setCompanyId] = useState<string | null>(null);
   const { user } = useAuth();
+  const [pipelineRefreshKey, setPipelineRefreshKey] = useState(0);
 
   // Pagination states
   const [flexCurrentPage, setFlexCurrentPage] = useState(1);
@@ -90,6 +92,13 @@ export default function BusinessPortal() {
   useEffect(() => {
     setProjectsCurrentPage(1);
   }, [searchTerm, sortOrder, activeSubtab]);
+
+  // Auto-sync pipeline when switching to pipeline tab
+  useEffect(() => {
+    if (activeTab === "pipeline" && companyId) {
+      syncPipelineWithShortlistAndMessages();
+    }
+  }, [activeTab, companyId]);
 
   // Calculate pagination for Humble Flex
   const flexTotalPages = Math.ceil(humbleFlexSubmissions.length / itemsPerPage);
@@ -205,6 +214,9 @@ export default function BusinessPortal() {
 
       // Update local state
       setShortlist((current) => current.filter((s) => s.id !== student.id));
+
+      // Handle pipeline removal logic
+      await handleShortlistRemoval(student.id);
     } else {
       // Add to database
       const { error } = await supabase.from("shortlists").insert({
@@ -219,6 +231,229 @@ export default function BusinessPortal() {
 
       // Update local state
       setShortlist((current) => [...current, student]);
+
+      // Sync pipeline after adding to shortlist
+      await syncPipelineWithShortlistAndMessages();
+    }
+  };
+
+  const handleShortlistRemoval = async (studentId: string) => {
+    if (!companyId) return;
+
+    try {
+      // Check if student has a conversation
+      const { data: conversationData, error: conversationError } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("student_id", studentId)
+        .maybeSingle();
+
+      if (conversationError) {
+        console.error("Error checking conversation:", conversationError);
+        return;
+      }
+
+      // Check current pipeline stage
+      const { data: pipelineData, error: pipelineError } = await supabase
+        .from("student_pipeline")
+        .select("stage")
+        .eq("company_id", companyId)
+        .eq("student_id", studentId)
+        .maybeSingle();
+
+      if (pipelineError) {
+        console.error("Error checking pipeline stage:", pipelineError);
+        return;
+      }
+
+      if (!pipelineData) {
+        // Not in pipeline, nothing to do
+        return;
+      }
+
+      const currentStage = pipelineData.stage;
+
+      // Never remove if at later stages (manual tracking)
+      if (
+        currentStage === "interviewing" ||
+        currentStage === "hired" ||
+        currentStage === "not_a_fit"
+      ) {
+        console.log("Student at later stage, keeping in pipeline");
+        return;
+      }
+
+      // If they have a conversation, keep them but ensure they're "contacted"
+      if (conversationData) {
+        if (currentStage === "shortlisted") {
+          // Upgrade to contacted since they were messaged
+          const { error: updateError } = await supabase
+            .from("student_pipeline")
+            .update({ stage: "contacted", updated_at: new Date().toISOString() })
+            .eq("company_id", companyId)
+            .eq("student_id", studentId);
+
+          if (updateError) {
+            console.error("Error updating to contacted:", updateError);
+          } else {
+            console.log("Updated student to 'contacted' after shortlist removal");
+          }
+        }
+        // If already "contacted", no change needed
+      } else {
+        // No conversation and only at "shortlisted" stage - remove from pipeline
+        const { error: deleteError } = await supabase
+          .from("student_pipeline")
+          .delete()
+          .eq("company_id", companyId)
+          .eq("student_id", studentId);
+
+        if (deleteError) {
+          console.error("Error removing from pipeline:", deleteError);
+        } else {
+          console.log("Removed student from pipeline");
+        }
+      }
+
+      // Trigger pipeline refresh
+      setPipelineRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      console.error("Unexpected error handling shortlist removal:", err);
+    }
+  };
+
+  const syncPipelineWithShortlistAndMessages = async () => {
+    if (!companyId) return;
+
+    try {
+      // Get all students in shortlist
+      const { data: shortlistData, error: shortlistError } = await supabase
+        .from("shortlists")
+        .select("student_id")
+        .eq("company_id", companyId);
+
+      if (shortlistError) {
+        console.error("Error loading shortlist for sync:", shortlistError);
+        return;
+      }
+
+      const shortlistedIds = shortlistData?.map((s) => s.student_id) || [];
+
+      // Get all students with active conversations
+      const { data: conversationData, error: conversationError } = await supabase
+        .from("conversations")
+        .select("student_id")
+        .eq("company_id", companyId);
+
+      if (conversationError) {
+        console.error("Error loading conversations for sync:", conversationError);
+        return;
+      }
+
+      const conversationIds = conversationData?.map((c) => c.student_id) || [];
+
+      // Get existing pipeline entries for this company
+      const { data: pipelineData, error: pipelineError } = await supabase
+        .from("student_pipeline")
+        .select("student_id, stage")
+        .eq("company_id", companyId);
+
+      if (pipelineError) {
+        console.error("Error loading pipeline for sync:", pipelineError);
+        return;
+      }
+
+      const existingPipeline = new Map(
+        (pipelineData || []).map((p) => [p.student_id, p.stage])
+      );
+
+      const studentsToAdd: Array<{
+        company_id: string;
+        student_id: string;
+        stage: string;
+        updated_at: string;
+      }> = [];
+
+      const studentsToUpdate: Array<{
+        company_id: string;
+        student_id: string;
+        stage: string;
+        updated_at: string;
+      }> = [];
+
+      // Process shortlisted students
+      for (const studentId of shortlistedIds) {
+        if (!existingPipeline.has(studentId)) {
+          // Not in pipeline yet, add as "shortlisted"
+          studentsToAdd.push({
+            company_id: companyId,
+            student_id: studentId,
+            stage: "shortlisted",
+            updated_at: new Date().toISOString(),
+          });
+        }
+        // If already in pipeline, don't change their stage
+      }
+
+      // Process students with conversations
+      for (const studentId of conversationIds) {
+        const currentStage = existingPipeline.get(studentId);
+
+        if (!currentStage) {
+          // Not in pipeline yet, add as "contacted"
+          studentsToAdd.push({
+            company_id: companyId,
+            student_id: studentId,
+            stage: "contacted",
+            updated_at: new Date().toISOString(),
+          });
+        } else if (currentStage === "shortlisted") {
+          // In pipeline as "shortlisted", upgrade to "contacted"
+          studentsToUpdate.push({
+            company_id: companyId,
+            student_id: studentId,
+            stage: "contacted",
+            updated_at: new Date().toISOString(),
+          });
+        }
+        // If already at a later stage (interviewing, hired, not_a_fit), don't change
+      }
+
+      // Batch insert new entries
+      if (studentsToAdd.length > 0) {
+        const { error: insertError } = await supabase
+          .from("student_pipeline")
+          .insert(studentsToAdd);
+
+        if (insertError) {
+          console.error("Error adding students to pipeline:", insertError);
+        } else {
+          console.log(`Added ${studentsToAdd.length} students to pipeline`);
+        }
+      }
+
+      // Batch update existing entries
+      for (const update of studentsToUpdate) {
+        const { error: updateError } = await supabase
+          .from("student_pipeline")
+          .update({ stage: update.stage, updated_at: update.updated_at })
+          .eq("company_id", update.company_id)
+          .eq("student_id", update.student_id);
+
+        if (updateError) {
+          console.error("Error updating student stage:", updateError);
+        }
+      }
+
+      if (studentsToUpdate.length > 0) {
+        console.log(`Updated ${studentsToUpdate.length} students to "contacted" stage`);
+      }
+
+      // Trigger pipeline refresh
+      setPipelineRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      console.error("Unexpected error syncing pipeline:", err);
     }
   };
 
@@ -280,6 +515,9 @@ export default function BusinessPortal() {
 
       setInitialConversationId(conversationId);
       setActiveTab("messages");
+
+      // Sync pipeline after starting conversation
+      await syncPipelineWithShortlistAndMessages();
     } catch (err) {
       console.error("Unexpected error starting conversation:", err);
     }
@@ -837,8 +1075,28 @@ export default function BusinessPortal() {
               </div>
             )}
 
-            {activeTab === "profile" && companyId && (
-              <CompanyProfile companyId={companyId} />
+            {activeTab === "profile" && (
+              <>
+                {companyId ? (
+                  <CompanyProfile companyId={companyId} />
+                ) : (
+                  <div className="flex items-center justify-center py-12">
+                    <p className="text-gray-500">Loading company profile...</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === "pipeline" && (
+              <>
+                {companyId ? (
+                  <PipelineKanban key={pipelineRefreshKey} companyId={companyId} />
+                ) : (
+                  <div className="flex items-center justify-center py-12">
+                    <p className="text-gray-500">Loading pipeline...</p>
+                  </div>
+                )}
+              </>
             )}
           </main>
         )}

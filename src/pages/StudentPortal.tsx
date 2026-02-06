@@ -54,12 +54,6 @@ type ProfileRow = {
   side_project_link: string | null;
 };
 
-const openExternalLink = (raw?: string | null) => {
-  const normalized = normalizeUrl(raw);
-  if (!normalized) return;
-  window.open(normalized, "_blank", "noopener,noreferrer");
-};
-
 const normalizeUrl = (raw?: string | null) => {
   const value = (raw ?? "").trim();
   if (!value) return null;

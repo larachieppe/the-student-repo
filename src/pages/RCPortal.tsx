@@ -76,7 +76,15 @@ export default function RCPortal() {
   const [analytics, setAnalytics] = useState({
     totalShortlists: 0,
     totalIntroductions: 0,
-    companyActivity: [] as Array<{ companyName: string; conversations: number; shortlists: number }>,
+    totalInterviewing: 0,
+    conversionRateInterviewingFromShortlists: 0, // interviewing / shortlists (0..1)
+    companyActivity: [] as Array<{
+      companyName: string;
+      conversations: number;
+      shortlists: number;
+      interviewing: number;
+      conversionRateInterviewingFromShortlists: number; // 0..1
+    }>,
   });
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
@@ -300,31 +308,47 @@ export default function RCPortal() {
       setAnalyticsLoading(true);
       try {
         // Get total shortlists
-        const { count: shortlistCount, error: shortlistError } = await supabase
+        const { count: shortlistCount } = await supabase
           .from("shortlists")
           .select("*", { count: "exact", head: true });
 
         // Get total introductions (conversations with company_id and student_id)
-        const { count: introCount, error: introError } = await supabase
+        const { count: introCount } = await supabase
           .from("conversations")
           .select("*", { count: "exact", head: true })
           .not("company_id", "is", null)
           .not("student_id", "is", null);
 
+        // Get total students in interviewing stage (from pipeline)
+        const { count: interviewingCount, error: interviewingError } = await supabase
+          .from("student_pipeline")
+          .select("*", { count: "exact", head: true })
+          .eq("stage", "interviewing");
+
         // Get company activity (top companies by conversations and shortlists)
-        const { data: conversationsData, error: convDataError } = await supabase
+        const { data: conversationsData } = await supabase
           .from("conversations")
           .select("company_id")
           .not("company_id", "is", null);
 
-        const { data: shortlistsData, error: shortlistDataError } = await supabase
+        const { data: shortlistsData } = await supabase
           .from("shortlists")
           .select("company_id");
+
+        const { data: interviewingData, error: interviewingDataError } = await supabase
+          .from("student_pipeline")
+          .select("company_id")
+          .eq("stage", "interviewing");
+
+        if (interviewingError) {
+          console.error("Error loading interviewing count", interviewingError);
+        }
 
         // Get company names
         const companyIds = new Set<string>();
         conversationsData?.forEach((c) => c.company_id && companyIds.add(c.company_id));
         shortlistsData?.forEach((s) => s.company_id && companyIds.add(s.company_id));
+        interviewingData?.forEach((p) => p.company_id && companyIds.add(p.company_id));
 
         let companiesMap: { [key: string]: string } = {};
         if (companyIds.size > 0) {
@@ -342,12 +366,14 @@ export default function RCPortal() {
         }
 
         // Count conversations and shortlists per company
-        const companyStats: { [key: string]: { conversations: number; shortlists: number } } = {};
+        const companyStats: {
+          [key: string]: { conversations: number; shortlists: number; interviewing: number };
+        } = {};
         
         conversationsData?.forEach((c) => {
           if (c.company_id) {
             if (!companyStats[c.company_id]) {
-              companyStats[c.company_id] = { conversations: 0, shortlists: 0 };
+              companyStats[c.company_id] = { conversations: 0, shortlists: 0, interviewing: 0 };
             }
             companyStats[c.company_id].conversations++;
           }
@@ -356,24 +382,46 @@ export default function RCPortal() {
         shortlistsData?.forEach((s) => {
           if (s.company_id) {
             if (!companyStats[s.company_id]) {
-              companyStats[s.company_id] = { conversations: 0, shortlists: 0 };
+              companyStats[s.company_id] = { conversations: 0, shortlists: 0, interviewing: 0 };
             }
             companyStats[s.company_id].shortlists++;
           }
         });
+
+        interviewingData?.forEach((p) => {
+          if (p.company_id) {
+            if (!companyStats[p.company_id]) {
+              companyStats[p.company_id] = { conversations: 0, shortlists: 0, interviewing: 0 };
+            }
+            companyStats[p.company_id].interviewing++;
+          }
+        });
+
+        if (interviewingDataError) {
+          console.error("Error loading interviewing pipeline rows", interviewingDataError);
+        }
 
         const companyActivity = Object.entries(companyStats)
           .map(([companyId, stats]) => ({
             companyName: companiesMap[companyId] || "Unknown Company",
             conversations: stats.conversations,
             shortlists: stats.shortlists,
+            interviewing: stats.interviewing,
+            conversionRateInterviewingFromShortlists:
+              stats.shortlists > 0 ? stats.interviewing / stats.shortlists : 0,
           }))
           .sort((a, b) => b.conversations - a.conversations)
           .slice(0, 10); // Top 10 companies
 
+        const safeShortlists = shortlistCount ?? 0;
+        const safeInterviewing = interviewingCount ?? 0;
+
         setAnalytics({
-          totalShortlists: shortlistCount ?? 0,
+          totalShortlists: safeShortlists,
           totalIntroductions: introCount ?? 0,
+          totalInterviewing: safeInterviewing,
+          conversionRateInterviewingFromShortlists:
+            safeShortlists > 0 ? safeInterviewing / safeShortlists : 0,
           companyActivity,
         });
       } catch (err) {
@@ -618,6 +666,7 @@ export default function RCPortal() {
           <main className="flex-1 flex justify-center items-start bg-white pt-8">
             <MessagesSection
               initialConversationId={initialConversationId ?? undefined}
+              role="business"
             />
           </main>
         ) : (
@@ -1149,7 +1198,7 @@ export default function RCPortal() {
                 ) : (
                   <>
                     {/* Key Metrics Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                       <div className="bg-white border border-gray-200 rounded-2xl p-6">
                         <div className="text-sm text-gray-500 mb-1">Total Introductions</div>
                         <div className="text-3xl font-semibold text-gray-900">
@@ -1160,6 +1209,21 @@ export default function RCPortal() {
                         <div className="text-sm text-gray-500 mb-1">Total Shortlists</div>
                         <div className="text-3xl font-semibold text-gray-900">
                           {analytics.totalShortlists}
+                        </div>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-2xl p-6">
+                        <div className="text-sm text-gray-500 mb-1">
+                          Conversion (Interviewing / Shortlists)
+                        </div>
+                        <div className="text-3xl font-semibold text-gray-900">
+                          {Math.round(
+                            analytics.conversionRateInterviewingFromShortlists * 1000
+                          ) / 10}
+                          %
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {analytics.totalInterviewing} interviewing out of{" "}
+                          {analytics.totalShortlists} shortlists
                         </div>
                       </div>
                     </div>
@@ -1185,6 +1249,12 @@ export default function RCPortal() {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Shortlists
                                 </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Interviewing
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Conversion
+                                </th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -1198,6 +1268,16 @@ export default function RCPortal() {
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     {company.shortlists}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {company.interviewing}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {Math.round(
+                                      company.conversionRateInterviewingFromShortlists *
+                                        1000
+                                    ) / 10}
+                                    %
                                   </td>
                                 </tr>
                               ))}
