@@ -21,11 +21,14 @@ type Message = {
 type MessagesSectionProps = {
   initialConversationId?: string;
   companyId?: string;
+  studentId?: string;
+  role: "business" | "student";
 };
 
 export default function MessagesSection({
   initialConversationId,
   companyId,
+  studentId,
 }: MessagesSectionProps) {
   const [selectedId, setSelectedId] = useState<string | null>(
     initialConversationId ?? null
@@ -34,6 +37,9 @@ export default function MessagesSection({
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
 
+  const isBusinessUser = !!companyId;
+  const isStudentUser = !!studentId;
+
   const selectedConversation = conversations.find((c) => c.id === selectedId);
   const conversationMessages = messages.filter(
     (m) => m.conversationId === selectedId
@@ -41,19 +47,18 @@ export default function MessagesSection({
 
   useEffect(() => {
     const loadConversations = async () => {
-      // Build query to filter by company_id for business users
+      // Build query to filter by company_id for business users or student_id for students
       let query = supabase
         .from("conversations")
         .select(
           `
           id,
           student_id,
-          messages:messages(
+          company_id,
+          updated_at,
+          messages(
             content,
             created_at
-          ),
-          participants:conversation_participants(
-            user_id
           )
         `
         )
@@ -64,6 +69,11 @@ export default function MessagesSection({
         query = query.eq("company_id", companyId);
       }
 
+      // Filter by student_id if provided (for student users)
+      if (studentId) {
+        query = query.eq("student_id", studentId);
+      }
+
       const { data, error } = await query;
 
       if (error) {
@@ -71,67 +81,106 @@ export default function MessagesSection({
         return;
       }
 
-      // Get unique student IDs to fetch their names
-      const studentIds = data
-        .map((row: any) => row.student_id)
-        .filter((id: string | null) => id !== null);
+      if (isStudentUser) {
+        // Student sees company names
+        const companyIds = data
+          .map((row: any) => row.company_id)
+          .filter((id: string | null) => id !== null);
 
-      // Fetch student names from submissions table
-      let studentsMap: { [key: string]: string } = {};
-      if (studentIds.length > 0) {
-        const { data: students, error: studentsError } = await supabase
-          .from("submissions")
-          .select("id, first_name, last_name")
-          .in("id", studentIds);
+        let companiesMap: { [key: string]: string } = {};
+        if (companyIds.length > 0) {
+          const { data: companies, error: companiesError } = await supabase
+            .from("companies")
+            .select("id, name")
+            .in("id", companyIds);
 
-        if (!studentsError && students) {
-          studentsMap = students.reduce((acc: any, student: any) => {
-            acc[student.id] = `${student.first_name} ${student.last_name}`;
-            return acc;
-          }, {});
+          if (!companiesError && companies) {
+            companiesMap = companies.reduce((acc: any, company: any) => {
+              acc[company.id] = company.name;
+              return acc;
+            }, {});
+          }
         }
-      }
 
-      // Map supabase rows into your ConversationSummary shape
-      const mapped: ConversationSummary[] = data.map((row: any) => ({
-        id: row.id,
-        name: studentsMap[row.student_id] || "Unknown Student",
-        handle: `@${(studentsMap[row.student_id] || "student")
-          .toLowerCase()
-          .replace(" ", "")}`,
-        lastMessage: row.messages?.[row.messages.length - 1]?.content ?? "",
-        lastActive: "", // format from created_at if you want
-        unreadCount: 0,
-      }));
+        const mapped: ConversationSummary[] = data.map((row: any) => ({
+          id: row.id,
+          name: companiesMap[row.company_id] || "Unknown Company",
+          handle: `@${(companiesMap[row.company_id] || "company")
+            .toLowerCase()
+            .replace(/\s+/g, "")}`,
+          lastMessage: row.messages?.[row.messages.length - 1]?.content ?? "",
+          lastActive: "",
+          unreadCount: 0,
+        }));
 
-      setConversations(mapped);
+        setConversations(mapped);
 
-      if (!mapped.length) {
-        setSelectedId(null);
-        return;
-      }
+        if (!mapped.length) {
+          setSelectedId(null);
+          return;
+        }
 
-      if (initialConversationId) {
-        const match = mapped.find((c) => c.id === initialConversationId);
-        setSelectedId(match ? match.id : mapped[0].id);
-      } else if (!selectedId) {
-        setSelectedId(mapped[0].id);
+        if (initialConversationId) {
+          const match = mapped.find((c) => c.id === initialConversationId);
+          setSelectedId(match ? match.id : mapped[0].id);
+        } else if (!selectedId) {
+          setSelectedId(mapped[0].id);
+        }
+      } else {
+        // Business user sees student names
+        const studentIds = data
+          .map((row: any) => row.student_id)
+          .filter((id: string | null) => id !== null);
+
+        let studentsMap: { [key: string]: string } = {};
+        if (studentIds.length > 0) {
+          const { data: students, error: studentsError } = await supabase
+            .from("submissions")
+            .select("id, first_name, last_name")
+            .in("id", studentIds);
+
+          if (!studentsError && students) {
+            studentsMap = students.reduce((acc: any, student: any) => {
+              acc[student.id] = `${student.first_name} ${student.last_name}`;
+              return acc;
+            }, {});
+          }
+        }
+
+        const mapped: ConversationSummary[] = data.map((row: any) => ({
+          id: row.id,
+          name: studentsMap[row.student_id] || "Unknown Student",
+          handle: `@${(studentsMap[row.student_id] || "student")
+            .toLowerCase()
+            .replace(/\s+/g, "")}`,
+          lastMessage: row.messages?.[row.messages.length - 1]?.content ?? "",
+          lastActive: "",
+          unreadCount: 0,
+        }));
+
+        setConversations(mapped);
+
+        if (!mapped.length) {
+          setSelectedId(null);
+          return;
+        }
+
+        if (initialConversationId) {
+          const match = mapped.find((c) => c.id === initialConversationId);
+          setSelectedId(match ? match.id : mapped[0].id);
+        } else if (!selectedId) {
+          setSelectedId(mapped[0].id);
+        }
       }
     };
 
     loadConversations();
-  }, [initialConversationId, companyId]);
+  }, [initialConversationId, companyId, studentId]);
 
   useEffect(() => {
     if (!selectedId) return;
 
     const loadMessages = async () => {
-      //get current user once
-      const {
-        data: {},
-      } = await supabase.auth.getUser();
-
-      //fetch messages for this conversation
       const { data, error } = await supabase
         .from("messages")
         .select("id, content, sender, created_at, conversation_id")
@@ -143,13 +192,15 @@ export default function MessagesSection({
         return;
       }
 
-      //map without any await inside map
-      // sender is "students" or "businessUsers", business user sees "businessUsers" messages as "me"
+      // For business users: "businessUsers" messages are "me"
+      // For student users: "students" messages are "me"
+      const myType = isBusinessUser ? "businessUsers" : "students";
+
       setMessages(
         data.map((m: any) => ({
           id: m.id,
           conversationId: m.conversation_id,
-          from: m.sender === "businessUsers" ? "me" : "them",
+          from: m.sender === myType ? "me" : "them",
           text: m.content,
           timestamp: new Date(m.created_at).toLocaleTimeString([], {
             hour: "numeric",
@@ -160,7 +211,46 @@ export default function MessagesSection({
     };
 
     loadMessages();
-  }, [selectedId]);
+
+    // Subscribe to new messages in this conversation
+    const channel = supabase
+      .channel(`messages:${selectedId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${selectedId}`,
+        },
+        (payload) => {
+          const newMessage = payload.new as any;
+          const myType = isBusinessUser ? "businessUsers" : "students";
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: newMessage.id,
+              conversationId: newMessage.conversation_id,
+              from: newMessage.sender === myType ? "me" : "them",
+              text: newMessage.content,
+              timestamp: new Date(newMessage.created_at).toLocaleTimeString(
+                [],
+                {
+                  hour: "numeric",
+                  minute: "2-digit",
+                }
+              ),
+            },
+          ]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedId, isBusinessUser]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,15 +261,29 @@ export default function MessagesSection({
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data, error } = await supabase
+    // Get participant ids from the conversation so we can populate both fields
+    const { data: conv, error: convErr } = await supabase
+      .from("conversations")
+      .select("student_id, company_id")
+      .eq("id", selectedId)
+      .single();
+
+    if (convErr || !conv) {
+      console.error("Error loading conversation:", convErr);
+      return;
+    }
+
+    const messagePayload = {
+      conversation_id: selectedId,
+      sender: isBusinessUser ? "businessUsers" : "students",
+      content: draft.trim(),
+      student_id: conv.student_id,
+      business_id: conv.company_id,
+    };
+
+    const { error } = await supabase
       .from("messages")
-      .insert({
-        conversation_id: selectedId,
-        business_id: user.id,
-        student_id: null,
-        sender: "businessUsers", // Must be 'students' or 'businessUsers'
-        content: draft.trim(),
-      })
+      .insert(messagePayload)
       .select()
       .single();
 
@@ -188,35 +292,29 @@ export default function MessagesSection({
       return;
     }
 
-    // Optimistically update local state
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: data.id,
-        conversationId: data.conversation_id,
-        from: "me",
-        text: data.content,
-        timestamp: new Date(data.created_at).toLocaleTimeString([], {
-          hour: "numeric",
-          minute: "2-digit",
-        }),
-      },
-    ]);
+    // Update the conversation's updated_at timestamp
+    await supabase
+      .from("conversations")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", selectedId);
 
+    // Don't add to local state here - let the realtime subscription handle it
     setDraft("");
   };
 
   return (
     <div
       className="flex overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm w-full max-w-7xl mx-auto"
-      style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}
+      style={{ height: "calc(100vh - 200px)", minHeight: "600px" }}
     >
       {/* Left: conversation list */}
       <aside className="w-1/3 border-r border-slate-200 flex flex-col">
         <div className="px-4 py-3 border-b border-slate-200">
           <h1 className="font-semibold text-slate-900">Messages</h1>
           <p className="text-xs text-slate-500">
-            Chat with students you’ve shortlisted.
+            {isStudentUser
+              ? "Chat with companies that have reached out."
+              : "Chat with students you've shortlisted."}
           </p>
         </div>
 
@@ -235,45 +333,51 @@ export default function MessagesSection({
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {conversations.map((c) => {
-            const isActive = c.id === selectedId;
-            return (
-              <button
-                key={c.id}
-                onClick={() => setSelectedId(c.id)}
-                className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition ${
-                  isActive ? "bg-brand-blue/5" : "hover:bg-slate-50"
-                }`}
-              >
-                {/* Avatar (initials) */}
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
-                  {c.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .slice(0, 2)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-xs font-semibold text-slate-900">
-                      {c.name}
-                    </p>
-                    <span className="shrink-0 text-[10px] text-slate-400">
-                      {c.lastActive}
-                    </span>
+          {conversations.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-xs text-slate-400 px-4 text-center">
+              No conversations yet.
+            </div>
+          ) : (
+            conversations.map((c) => {
+              const isActive = c.id === selectedId;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedId(c.id)}
+                  className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition ${
+                    isActive ? "bg-brand-blue/5" : "hover:bg-slate-50"
+                  }`}
+                >
+                  {/* Avatar (initials) */}
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
+                    {c.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .slice(0, 2)}
                   </div>
-                  <p className="truncate text-[11px] text-slate-500">
-                    {c.lastMessage}
-                  </p>
-                </div>
-                {c.unreadCount && c.unreadCount > 0 && (
-                  <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-brand-blue text-[10px] font-semibold text-white">
-                    {c.unreadCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-xs font-semibold text-slate-900">
+                        {c.name}
+                      </p>
+                      <span className="shrink-0 text-[10px] text-slate-400">
+                        {c.lastActive}
+                      </span>
+                    </div>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {c.lastMessage}
+                    </p>
+                  </div>
+                  {c.unreadCount && c.unreadCount > 0 && (
+                    <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-brand-blue text-[10px] font-semibold text-white">
+                      {c.unreadCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          )}
         </div>
       </aside>
 
@@ -295,8 +399,9 @@ export default function MessagesSection({
                   {selectedConversation.name}
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  {selectedConversation.handle} · Active{" "}
-                  {selectedConversation.lastActive} ago
+                  {selectedConversation.handle}
+                  {selectedConversation.lastActive &&
+                    ` · Active ${selectedConversation.lastActive} ago`}
                 </p>
               </div>
             </div>

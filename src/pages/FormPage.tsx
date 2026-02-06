@@ -137,7 +137,10 @@ export default function FormPage() {
 
       if (uploadError) {
         // Provide more helpful error messages
-        if (uploadError.message?.includes("Bucket not found") || uploadError.message?.includes("not found")) {
+        if (
+          uploadError.message?.includes("Bucket not found") ||
+          uploadError.message?.includes("not found")
+        ) {
           throw new Error(
             "Storage bucket 'student-attachments' not found. Please create it in your Supabase Storage settings."
           );
@@ -286,23 +289,26 @@ export default function FormPage() {
       const { uploadedUrls } = await uploadAttachments(form.email, files);
 
       // 2) Save submission row including attachment URLs
-      const { error } = await supabase.from("submissions").upsert({
-        first_name: form.firstName,
-        last_name: form.lastName,
-        email: form.email,
-        school: form.school,
-        graduation_year: form.graduationYear,
-        major: form.major,
-        github: form.github,
-        linkedin: form.linkedin,
-        type_of_work: form.typeOfWork,
-        relocating: form.relocating,
-        skills: form.skills,
-        side_projects: form.sideProjects,
-        flex: form.flex,
-        side_project_link: form.sideProjectLink,
-        attachment_urls: uploadedUrls,
-      });
+      const { error } = await supabase.from("submissions").upsert(
+        {
+          first_name: form.firstName,
+          last_name: form.lastName,
+          email: form.email,
+          school: form.school,
+          graduation_year: form.graduationYear,
+          major: form.major,
+          github: form.github,
+          linkedin: form.linkedin,
+          type_of_work: form.typeOfWork,
+          relocating: form.relocating,
+          skills: form.skills,
+          side_projects: form.sideProjects,
+          flex: form.flex,
+          side_project_link: form.sideProjectLink,
+          attachment_urls: uploadedUrls,
+        },
+        { onConflict: "email" }
+      );
 
       if (error) {
         console.error("Supabase insert error:", error);

@@ -32,9 +32,7 @@ export default function CompaniesHiringSection(): JSX.Element {
       <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {logos.map((l) => (
           <CompanyCard key={l.alt}>
-            {/* ↓ shorter card height */}
             <div className="flex h-24 sm:h-28 w-full items-center justify-center">
-              {/* ↓ smaller logo base height (your per-logo scale() can stay) */}
               <div className="h-10 sm:h-12">
                 <img
                   src={l.src}
@@ -46,6 +44,18 @@ export default function CompaniesHiringSection(): JSX.Element {
             </div>
           </CompanyCard>
         ))}
+      </div>
+
+      {/* ✨ CTA button */}
+      <div className="mt-12 flex justify-center">
+        <a
+          href="https://www.reachcapital.com/companies"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-lg bg-brand-blue text-sm text-white hover:brightness-95 p-4"
+        >
+          EXPLORE ALL PORTFOLIO COMPANIES →
+        </a>
       </div>
     </section>
   );
