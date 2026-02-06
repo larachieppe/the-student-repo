@@ -32,6 +32,7 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
     { key: "students", label: "STUDENTS" },
     { key: "shortlist", label: "SHORTLIST" },
     { key: "messages", label: "MESSAGES" },
+    { key: "profile", label: "PROFILE" },
   ];
 
   let routeTabs = tabs;
@@ -112,7 +113,24 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
 
         {/* right side */}
         <div className="flex items-center gap-3">
-          {!user ? (
+          {isHome ? (
+            /* Always show public buttons on home page */
+            <>
+              <Link
+                className="hidden rounded-lg px-3 py-1.5 text-sm text-brand-text hover:border md:inline-block min-w-[80px]"
+                to="/login"
+              >
+                LOG IN
+              </Link>
+              <Link
+                className="rounded-lg bg-brand-blue px-3 py-1.5 text-sm text-white hover:brightness-95 min-w-[180px] text-center"
+                to="/form"
+              >
+                SUBMIT YOUR PROFILE
+              </Link>
+            </>
+          ) : !user ? (
+            /* Not home and not logged in - show login/signup */
             <>
               <Link
                 className="hidden rounded-lg px-3 py-1.5 text-sm text-brand-text hover:border md:inline-block min-w-[80px]"
@@ -128,6 +146,7 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
               </Link>
             </>
           ) : (
+            /* Logged in and not on home page - show logout */
             <>
               <button
                 onClick={async () => {

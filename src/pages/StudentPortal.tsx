@@ -32,8 +32,10 @@ type ProfileRow = {
   github: string | null;
   linkedin: string | null;
   profile_picture_url: string | null;
-  location: string | null;
   type_of_work: string[] | null;
+  relocating: string | null;
+  side_projects: string | null;
+  side_project_link: string | null;
 };
 
 export default function StudentPortal() {
@@ -49,6 +51,9 @@ export default function StudentPortal() {
   const email = user?.email?.toLowerCase() ?? null;
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
 
   const openExternalLink = (url?: string) => {
     if (!url) return;
@@ -69,13 +74,84 @@ export default function StudentPortal() {
     gradYear: "",
     location: "",
     workType: "",
+    relocating: "",
     skills: [] as string[],
     flex: "",
     github: "" as string,
     linkedin: "" as string,
+    sideProjects: "",
+    sideProjectLink: "",
   });
 
   const myFlex = humbleFlexSubmissions[0];
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file (JPG, PNG, etc.)");
+      return;
+    }
+
+    // Validate file size (max 5MB for profile pictures)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert("Image size must be less than 5MB");
+      return;
+    }
+
+    setProfileImageFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadProfileImage = async (): Promise<string | null> => {
+    if (!profileImageFile || !email) return null;
+
+    setUploadingImage(true);
+    try {
+      const timestamp = Date.now();
+      const fileExt = profileImageFile.name.split(".").pop();
+      const fileName = `profile_${timestamp}.${fileExt}`;
+      const path = `profile-pictures/${email}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("student-attachments")
+        .upload(path, profileImageFile, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: profileImageFile.type,
+        });
+
+      if (uploadError) {
+        console.error("Error uploading profile image:", uploadError);
+        throw uploadError;
+      }
+
+      const { data } = supabase.storage
+        .from("student-attachments")
+        .getPublicUrl(path);
+
+      if (!data?.publicUrl) {
+        throw new Error("Failed to generate public URL for profile image.");
+      }
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error("Profile image upload failed:", error);
+      alert("Failed to upload profile image. Please try again.");
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   useEffect(() => {
     if (!email) return;
@@ -84,7 +160,7 @@ export default function StudentPortal() {
       const { data, error } = await supabase
         .from("submissions")
         .select(
-          "first_name,last_name,major,school,graduation_year,skills,flex,github,linkedin,location,type_of_work,profile_picture_url"
+          "first_name,last_name,major,school,graduation_year,skills,flex,github,linkedin,type_of_work,profile_picture_url,relocating,side_projects,side_project_link"
         )
         .eq("email", email)
         .maybeSingle();
@@ -103,12 +179,15 @@ export default function StudentPortal() {
         major: row.major ?? "",
         school: row.school ?? "",
         gradYear: row.graduation_year ?? "",
-        location: row.location ?? "",
+        location: "",
         workType: (row.type_of_work ?? []).join(", "),
+        relocating: row.relocating ?? "",
         skills: row.skills ?? [],
         flex: row.flex ?? "",
         github: row.github ?? "",
         linkedin: row.linkedin ?? "",
+        sideProjects: row.side_projects ?? "",
+        sideProjectLink: row.side_project_link ?? "",
       });
     };
 
@@ -187,6 +266,18 @@ export default function StudentPortal() {
 
     setSavingProfile(true);
     try {
+      // Upload new profile image if one was selected
+      let finalProfilePictureUrl = profile.profilePictureUrl;
+      if (profileImageFile) {
+        const uploadedUrl = await uploadProfileImage();
+        if (uploadedUrl) {
+          finalProfilePictureUrl = uploadedUrl;
+        } else {
+          // Upload failed, don't proceed
+          return;
+        }
+      }
+
       const parts = profile.fullName.trim().split(" ");
       const first_name = parts.shift() ?? "";
       const last_name = parts.join(" ");
@@ -202,7 +293,10 @@ export default function StudentPortal() {
         flex: profile.flex,
         github: profile.github,
         linkedin: profile.linkedin,
-        profile_picture_url: profile.profilePictureUrl,
+        profile_picture_url: finalProfilePictureUrl,
+        relocating: profile.relocating,
+        side_projects: profile.sideProjects,
+        side_project_link: profile.sideProjectLink,
         type_of_work: profile.workType
           ? profile.workType
               .split(",")
@@ -219,6 +313,13 @@ export default function StudentPortal() {
         console.error("Error saving profile to submissions:", error);
         return;
       }
+
+      // Update local state with new profile picture URL
+      setProfile((p) => ({ ...p, profilePictureUrl: finalProfilePictureUrl }));
+
+      // Clear the file input state
+      setProfileImageFile(null);
+      setProfileImagePreview(null);
 
       setIsEditOpen(false);
     } finally {
@@ -338,7 +439,7 @@ export default function StudentPortal() {
                   </button>
                 </div>
 
-                {profile.workType ? (
+                {(profile.workType || profile.relocating) ? (
                   <>
                     <div className="my-6 border-t border-gray-200" />
                     <h3 className="text-sm font-semibold text-gray-900 mb-2">
@@ -349,6 +450,12 @@ export default function StudentPortal() {
                         <div className="flex items-center gap-2">
                           <span className="text-gray-400">💼</span>
                           <span>{profile.workType}</span>
+                        </div>
+                      ) : null}
+                      {profile.relocating ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">🌍</span>
+                          <span>Relocating: {profile.relocating}</span>
                         </div>
                       ) : null}
                     </div>
@@ -436,7 +543,11 @@ export default function StudentPortal() {
           {/* backdrop */}
           <div
             className="absolute inset-0 bg-black/40"
-            onClick={() => setIsEditOpen(false)}
+            onClick={() => {
+              setIsEditOpen(false);
+              setProfileImageFile(null);
+              setProfileImagePreview(null);
+            }}
           />
 
           {/* modal */}
@@ -447,7 +558,11 @@ export default function StudentPortal() {
                   Edit profile
                 </h2>
                 <button
-                  onClick={() => setIsEditOpen(false)}
+                  onClick={() => {
+                    setIsEditOpen(false);
+                    setProfileImageFile(null);
+                    setProfileImagePreview(null);
+                  }}
                   className="text-gray-500 hover:text-gray-700"
                 >
                   ✕
@@ -456,20 +571,61 @@ export default function StudentPortal() {
 
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="text-sm text-gray-600">
-                    Profile picture URL
+                  <label className="text-sm text-gray-600 block mb-2">
+                    Profile Picture
                   </label>
-                  <input
-                    value={profile.profilePictureUrl}
-                    onChange={(e) =>
-                      setProfile((p) => ({
-                        ...p,
-                        profilePictureUrl: e.target.value,
-                      }))
-                    }
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
-                    placeholder="https://"
-                  />
+
+                  {/* Image Preview */}
+                  <div className="flex items-center gap-4 mb-3">
+                    {profileImagePreview || profile.profilePictureUrl ? (
+                      <img
+                        src={profileImagePreview || profile.profilePictureUrl}
+                        alt="Profile preview"
+                        className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+                        <span className="text-gray-400 text-2xl">👤</span>
+                      </div>
+                    )}
+
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                        id="profile-image-upload"
+                      />
+                      <label
+                        htmlFor="profile-image-upload"
+                        className="inline-block cursor-pointer rounded-xl border-2 border-brand-blue bg-white px-4 py-2 text-sm font-medium text-brand-blue hover:bg-brand-blue hover:text-white transition"
+                      >
+                        Choose Image
+                      </label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        JPG, PNG (max 5MB)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Optional: URL input as fallback */}
+                  <div className="mt-3">
+                    <label className="text-xs text-gray-500">
+                      Or paste image URL
+                    </label>
+                    <input
+                      value={profile.profilePictureUrl}
+                      onChange={(e) =>
+                        setProfile((p) => ({
+                          ...p,
+                          profilePictureUrl: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                      placeholder="https://"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -527,8 +683,24 @@ export default function StudentPortal() {
                       setProfile((p) => ({ ...p, workType: e.target.value }))
                     }
                     className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
-                    placeholder="Full-Time"
+                    placeholder="Full-Time, Part-Time, Internship"
                   />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">Open to relocating?</label>
+                  <select
+                    value={profile.relocating}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, relocating: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                  >
+                    <option value="">Select...</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                    <option value="Maybe">Maybe</option>
+                  </select>
                 </div>
 
                 <div className="md:col-span-2">
@@ -548,21 +720,67 @@ export default function StudentPortal() {
                     placeholder="React, TypeScript, ..."
                   />
                 </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">Side Projects</label>
+                  <textarea
+                    value={profile.sideProjects}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, sideProjects: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                    placeholder="Describe your side projects..."
+                    rows={3}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">Side Project Link</label>
+                  <input
+                    value={profile.sideProjectLink}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, sideProjectLink: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                    placeholder="https://github.com/..."
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">Humble Flex</label>
+                  <textarea
+                    value={profile.flex}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, flex: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-2 text-sm"
+                    placeholder="Share your achievements..."
+                    rows={3}
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
                 <button
-                  onClick={() => setIsEditOpen(false)}
+                  onClick={() => {
+                    setIsEditOpen(false);
+                    setProfileImageFile(null);
+                    setProfileImagePreview(null);
+                  }}
                   className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={saveProfile}
-                  disabled={savingProfile}
+                  disabled={savingProfile || uploadingImage}
                   className="rounded-xl bg-brand-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                 >
-                  {savingProfile ? "Saving..." : "Save"}
+                  {uploadingImage
+                    ? "Uploading image..."
+                    : savingProfile
+                    ? "Saving..."
+                    : "Save"}
                 </button>
               </div>
             </div>

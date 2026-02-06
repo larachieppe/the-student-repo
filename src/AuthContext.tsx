@@ -202,29 +202,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("[OTP] signInWithOtp ok:", res.data);
         return { error: null };
       } else if (role === "admin") {
-        // For admin: check if email exists in accounts table with admin role
-        const { data: user, error: userError } = await supabase
-          .from("accounts")
-          .select("email, role")
-          .eq("email", cleanEmail)
-          .maybeSingle();
+        // For admin: check if email domain is reachcapital.com or berkeley.edu
+        const emailDomain = cleanEmail.split("@")[1];
+        const allowedAdminDomains = ["reachcapital.com", "berkeley.edu"];
 
-        if (userError) {
-          console.error("[Login] Error checking accounts:", userError);
-          return { error: { message: "Error checking user records. Please try again." } };
-        }
-
-        // If email doesn't exist
-        if (!user) {
+        if (!emailDomain) {
           return {
             error: {
-              message: "No admin account found with this email. Please contact support.",
+              message: "Invalid email address format.",
             },
           };
         }
 
-        // Check if role matches
-        if (user.role !== "admin") {
+        // Check if email domain is allowed for admin access
+        if (!allowedAdminDomains.includes(emailDomain)) {
+          return {
+            error: {
+              message: "Admin access is restricted to Reach Capital and Berkeley email addresses.",
+            },
+          };
+        }
+
+        // Check if user already exists in accounts table
+        const { data: existingUser } = await supabase
+          .from("accounts")
+          .select("id, email, role")
+          .eq("email", cleanEmail)
+          .maybeSingle();
+
+        // If user exists, check role
+        if (existingUser && existingUser.role !== "admin") {
           return {
             error: {
               message: "You are logging in with the wrong button. Please select the correct role.",
@@ -232,24 +239,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        // Role matches, send OTP
+        // Send OTP - allow user creation if they don't exist yet
         const res = await supabase.auth.signInWithOtp({
           email: cleanEmail,
           options: {
-            shouldCreateUser: false, // Don't create new users for admin
+            shouldCreateUser: true,
+            data: {
+              role: "admin",
+            },
           },
         });
 
         if (res.error) {
           console.error("[OTP] signInWithOtp error:", res.error);
-          // If user doesn't exist in auth but exists in users table, that's an error
-          if (res.error.message?.includes("not found") || res.error.message?.includes("does not exist")) {
-            return {
-              error: {
-                message: "Account not found. Please contact support to set up your account.",
-              },
-            };
-          }
           return { error: res.error };
         }
 

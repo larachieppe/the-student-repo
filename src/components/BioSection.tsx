@@ -8,11 +8,12 @@ interface Submission {
   school: string;
   major: string;
   graduation_year: string;
-  type_of_work: string[];   
-  relocating: string;      
-  skills: string[];         
+  type_of_work: string[];
+  relocating: string;
+  skills: string[];
   side_projects: string;
   flex: string;
+  profile_picture_url: string | null;
 }
 
 interface Student {
@@ -26,6 +27,7 @@ interface Student {
   employmentType: string;
   workPreference: string;
   skills: string[];
+  profilePictureUrl: string | null;
 }
 
 // this code is basically the translation between the submission data and the student data used in the component
@@ -46,6 +48,7 @@ function mapSubmissionToStudent(sub: Submission): Student {
         ? "Maybe relocating"
         : "Prefers not to relocate",
     skills: sub.skills ?? [],
+    profilePictureUrl: sub.profile_picture_url,
   };
 }
 
@@ -222,11 +225,19 @@ export default function BiosSection({
             <div className="flex gap-4">
               {/* Profile Picture */}
               <div className="flex-shrink-0">
-                <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
-                  <span className="text-2xl font-semibold text-gray-500">
-                    {student.name.charAt(0)}
-                  </span>
-                </div>
+                {student.profilePictureUrl ? (
+                  <img
+                    src={student.profilePictureUrl}
+                    alt={`${student.name}'s profile`}
+                    className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
+                    <span className="text-2xl font-semibold text-gray-500">
+                      {student.name.charAt(0)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Main Content */}

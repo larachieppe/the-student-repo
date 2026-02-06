@@ -105,11 +105,12 @@ export default function LoginPage() {
                 key={r.name}
                 onClick={() => setRole(r.name)}
                 type="button"
+                disabled={sent}
                 className={`flex flex-col items-center justify-center border-2 rounded-xl px-8 py-5 w-32 transition-all ${
                   role === r.name
                     ? "border-blue-600 bg-brand-blue text-white"
                     : "border-blue-300 text-brand-blue hover:border-brand-blue"
-                }`}
+                } ${sent ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <span className="text-sm font-semibold">{r.label}</span>
               </button>
