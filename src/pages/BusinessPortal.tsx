@@ -9,6 +9,7 @@ import ProjectCard from "../components/ProjectComponent";
 import BiosSection from "../components/BioSection";
 import MessagesSection from "../components/ConversationComponent";
 import CompanyProfile from "../components/CompanyProfile";
+import PipelineKanban from "../components/PipelineKanban";
 import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
 
@@ -839,6 +840,16 @@ export default function BusinessPortal() {
 
             {activeTab === "profile" && companyId && (
               <CompanyProfile companyId={companyId} />
+            )}
+
+            {activeTab === "pipeline" && companyId && (
+              <div>
+                <h1 className="text-xl font-semibold mb-4">Pipeline</h1>
+                <p className="text-sm text-gray-600 mb-6">
+                  Track student progress through your hiring funnel. Update stages and add notes to manage your recruiting process.
+                </p>
+                <PipelineKanban companyId={companyId} />
+              </div>
             )}
           </main>
         )}

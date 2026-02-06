@@ -6,6 +6,7 @@ const tabDefs = [
   { key: "shortlist", label: "SHORTLIST" },
   { key: "messages", label: "MESSAGES" },
   { key: "profile", label: "PROFILE" },
+  { key: "pipeline", label: "PIPELINE" },
 ] as const;
 
 export type TabKey = BusinessTabKey;

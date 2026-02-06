@@ -33,6 +33,7 @@ export default function NavBar({ tabs, activeTab, onChangeTab }: NavBarProps) {
     { key: "shortlist", label: "SHORTLIST" },
     { key: "messages", label: "MESSAGES" },
     { key: "profile", label: "PROFILE" },
+    { key: "pipeline", label: "PIPELINE" },
   ];
 
   let routeTabs = tabs;
