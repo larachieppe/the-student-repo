@@ -771,6 +771,7 @@ export default function RCPortal() {
                               onToggleShortlist={() =>
                                 toggleShortlist(studentProfile)
                               }
+                              showActions={false}
                             />
                           );
                         })}
@@ -890,6 +891,7 @@ export default function RCPortal() {
                               onToggleShortlist={() =>
                                 toggleShortlist(studentProfile)
                               }
+                              showActions={false}
                             />
                           );
                         })
@@ -975,6 +977,7 @@ export default function RCPortal() {
                     onStartConversation={handleStartConversation}
                     shortlist={shortlist}
                     onToggleShortlist={toggleShortlist}
+                    showActions={false}
                   />
                 )}
               </>
