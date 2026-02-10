@@ -6,6 +6,7 @@ import { supabase } from "../supabase";
 import { useAuth } from "../useAuth";
 import MessagesSection from "../components/ConversationComponent";
 import CompanyDetailModal from "../components/CompanyDetailModal";
+import NotificationsComponent from "../components/NotificationsComponent";
 
 interface HumbleFlexSubmission {
   id: string;
@@ -52,6 +53,8 @@ type ProfileRow = {
   relocating: string | null;
   side_projects: string | null;
   side_project_link: string | null;
+  email: string | null;
+  attachment_urls: string[] | null;
 };
 
 const normalizeUrl = (raw?: string | null) => {
@@ -106,6 +109,13 @@ export default function StudentPortal() {
     window.open(normalized, "_blank", "noopener,noreferrer");
   };
   const [studentId, setStudentId] = useState<string | null>(null);
+  const [myCompanies, setMyCompanies] = useState<Array<{
+    company_id: string;
+    company_name: string;
+    company_logo: string | null;
+    stage: string | null;
+  }>>([]);
+  const [loadingMyCompanies, setLoadingMyCompanies] = useState(false);
 
   const [profile, setProfile] = useState({
     profilePictureUrl: "",
@@ -121,6 +131,8 @@ export default function StudentPortal() {
     linkedin: "" as string,
     sideProjects: "",
     sideProjectLink: "",
+    email: "",
+    attachmentUrls: [] as string[],
   });
 
   const myFlex = humbleFlexSubmissions[0];
@@ -224,7 +236,7 @@ export default function StudentPortal() {
       const { data, error } = await supabase
         .from("submissions")
         .select(
-          "first_name,last_name,major,school,graduation_year,skills,flex,github,linkedin,type_of_work,profile_picture_url,relocating,side_projects,side_project_link"
+          "first_name,last_name,major,school,graduation_year,skills,flex,github,linkedin,type_of_work,profile_picture_url,relocating,side_projects,side_project_link,email,attachment_urls"
         )
         .eq("email", email)
         .limit(1)
@@ -253,6 +265,8 @@ export default function StudentPortal() {
         linkedin: row.linkedin ?? "",
         sideProjects: row.side_projects ?? "",
         sideProjectLink: row.side_project_link ?? "",
+        email: row.email ?? "",
+        attachmentUrls: row.attachment_urls ?? [],
       });
     };
 
@@ -328,6 +342,77 @@ export default function StudentPortal() {
     }));
   }, [myFlex]);
 
+  useEffect(() => {
+    if (!studentId) return;
+
+    const loadMyCompanies = async () => {
+      setLoadingMyCompanies(true);
+      try {
+        // Get conversations the student is part of
+        const { data: conversations, error: convError } = await supabase
+          .from("conversations")
+          .select("company_id")
+          .eq("student_id", studentId);
+
+        if (convError) {
+          console.error("Error loading conversations:", convError);
+          return;
+        }
+
+        if (!conversations || conversations.length === 0) {
+          setMyCompanies([]);
+          return;
+        }
+
+        const companyIds = conversations.map((c) => c.company_id);
+
+        // Get company details and pipeline status
+        const { data: companiesData, error: companiesError } = await supabase
+          .from("companies")
+          .select("id, name, logo_url")
+          .in("id", companyIds);
+
+        if (companiesError) {
+          console.error("Error loading companies:", companiesError);
+          return;
+        }
+
+        // Get pipeline status for each company
+        const { data: pipelineData, error: pipelineError } = await supabase
+          .from("student_pipeline")
+          .select("company_id, stage")
+          .eq("student_id", studentId)
+          .in("company_id", companyIds);
+
+        if (pipelineError) {
+          console.error("Error loading pipeline data:", pipelineError);
+        }
+
+        // Map pipeline stages by company_id
+        const stageMap = (pipelineData || []).reduce((acc: any, item: any) => {
+          acc[item.company_id] = item.stage;
+          return acc;
+        }, {});
+
+        // Combine data
+        const combined = (companiesData || []).map((company) => ({
+          company_id: company.id,
+          company_name: company.name,
+          company_logo: company.logo_url,
+          stage: stageMap[company.id] || null,
+        }));
+
+        setMyCompanies(combined);
+      } catch (err) {
+        console.error("Unexpected error loading my companies:", err);
+      } finally {
+        setLoadingMyCompanies(false);
+      }
+    };
+
+    loadMyCompanies();
+  }, [studentId]);
+
   const saveProfile = async () => {
     if (!email) return;
 
@@ -399,11 +484,12 @@ export default function StudentPortal() {
       <NavBar activeTab={activeTab} onChangeTab={setActiveTab} />
       <div className="mb-8">
         {activeTab === "companies" && (
-          <div className="mx-2 mt-6">
-            <div className="bg-white border border-gray-200 rounded-2xl p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Companies
-              </h3>
+          <>
+            <div className="w-full flex items-center justify-between py-6 px-2">
+              <h1 className="font-sans text-3xl font-bold text-gray-900">Companies</h1>
+            </div>
+            <div className="mx-2">
+              <div className="bg-white border border-gray-200 rounded-2xl p-6">
 
               {loadingCompanies ? (
                 <p className="text-gray-500 py-6">Loading companies...</p>
@@ -429,7 +515,7 @@ export default function StudentPortal() {
 
                   {/* Pagination */}
                   {companies.length > companiesPerPage && (
-                    <div className="mt-6 flex items-center justify-center gap-2">
+                    <div className="mt-8 flex items-center justify-center gap-4">
                       <button
                         onClick={() =>
                           setCompaniesCurrentPage((prev) =>
@@ -437,61 +523,16 @@ export default function StudentPortal() {
                           )
                         }
                         disabled={companiesCurrentPage === 1}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl border-2 border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-brand-blue transition-all"
                       >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
                         Previous
                       </button>
 
-                      <div className="flex items-center gap-1">
-                        {Array.from(
-                          {
-                            length: Math.ceil(
-                              companies.length / companiesPerPage
-                            ),
-                          },
-                          (_, i) => i + 1
-                        ).map((page) => {
-                          const totalPages = Math.ceil(
-                            companies.length / companiesPerPage
-                          );
-                          const showPage =
-                            page === 1 ||
-                            page === totalPages ||
-                            (page >= companiesCurrentPage - 1 &&
-                              page <= companiesCurrentPage + 1);
-
-                          const showEllipsis =
-                            (page === 2 && companiesCurrentPage > 3) ||
-                            (page === totalPages - 1 &&
-                              companiesCurrentPage < totalPages - 2);
-
-                          if (showEllipsis) {
-                            return (
-                              <span
-                                key={page}
-                                className="px-2 text-gray-500"
-                              >
-                                ...
-                              </span>
-                            );
-                          }
-
-                          if (!showPage) return null;
-
-                          return (
-                            <button
-                              key={page}
-                              onClick={() => setCompaniesCurrentPage(page)}
-                              className={`px-3 py-2 text-sm font-medium rounded-lg ${
-                                companiesCurrentPage === page
-                                  ? "bg-brand-blue text-white"
-                                  : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-                              }`}
-                            >
-                              {page}
-                            </button>
-                          );
-                        })}
+                      <div className="px-4 py-2 text-sm font-semibold text-gray-700">
+                        Page {companiesCurrentPage} of {Math.ceil(companies.length / companiesPerPage)}
                       </div>
 
                       <button
@@ -507,21 +548,25 @@ export default function StudentPortal() {
                           companiesCurrentPage ===
                           Math.ceil(companies.length / companiesPerPage)
                         }
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl border-2 border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-brand-blue transition-all"
                       >
                         Next
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
                       </button>
                     </div>
                   )}
                 </>
               )}
             </div>
-          </div>
+            </div>
+          </>
         )}
         {activeTab === "profile" && (
           <>
-            <div className="w-full flex items-center justify-between py-6">
-              <h1 className="font-sans text-xl ml-2">My Profile</h1>
+            <div className="w-full flex items-center justify-between py-6 px-2">
+              <h1 className="font-sans text-3xl font-bold text-gray-900">My Profile</h1>
               <button
                 onClick={() => setIsEditOpen(true)}
                 className="inline-flex font-sans items-center gap-2 rounded-full border-2 border-brand-blue px-5 py-2 text-black hover:bg-brand-blue/5 transition"
@@ -564,6 +609,9 @@ export default function StudentPortal() {
                   ) : null}
                   {profile.major ? (
                     <p className="text-gray-500 mt-1">{profile.major}</p>
+                  ) : null}
+                  {profile.email ? (
+                    <p className="text-gray-400 text-xs mt-1">{profile.email}</p>
                   ) : null}
                 </div>
 
@@ -648,8 +696,107 @@ export default function StudentPortal() {
                     </div>
                   </>
                 ) : null}
+
+                {profile.attachmentUrls.length > 0 ? (
+                  <>
+                    <div className="my-6 border-t border-gray-200" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                        Uploaded Files
+                      </h3>
+                      <div className="space-y-2">
+                        {profile.attachmentUrls.map((url, idx) => {
+                          // Extract filename from URL
+                          const filename = url.split('/').pop()?.split('?')[0] || `Attachment ${idx + 1}`;
+                          const decodedFilename = decodeURIComponent(filename);
+
+                          return (
+                            <a
+                              key={idx}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 p-2 rounded-lg border border-gray-200 hover:border-brand-blue hover:bg-brand-blue/5 transition text-xs group"
+                            >
+                              <span className="text-gray-400 group-hover:text-brand-blue">📎</span>
+                              <span className="flex-1 truncate text-gray-700 group-hover:text-brand-blue">
+                                {decodedFilename}
+                              </span>
+                              <span className="text-gray-400 group-hover:text-brand-blue">↗</span>
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                ) : null}
               </aside>
               <section className="space-y-6">
+                {/* COMPANIES I'M TALKING TO card */}
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 mr-2">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                    Companies I'm Talking To
+                  </h3>
+
+                  {loadingMyCompanies ? (
+                    <p className="text-gray-500 py-6">Loading...</p>
+                  ) : myCompanies.length === 0 ? (
+                    <p className="text-gray-500 py-6 text-sm">
+                      No active conversations with companies yet. Start browsing companies to connect!
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {myCompanies.map((company) => {
+                        const getStageDisplay = (stage: string | null) => {
+                          if (!stage) return { label: "Messaged", color: "bg-gray-100 text-gray-700" };
+
+                          const stageMap: { [key: string]: { label: string; color: string } } = {
+                            shortlisted: { label: "Shortlisted", color: "bg-blue-100 text-blue-700" },
+                            contacted: { label: "Contacted", color: "bg-yellow-100 text-yellow-700" },
+                            interviewing: { label: "Interviewing", color: "bg-purple-100 text-purple-700" },
+                            hired: { label: "Hired", color: "bg-green-100 text-green-700" },
+                            not_a_fit: { label: "Not a Fit", color: "bg-gray-100 text-gray-700" },
+                          };
+
+                          return stageMap[stage] || { label: stage, color: "bg-gray-100 text-gray-700" };
+                        };
+
+                        const stageDisplay = getStageDisplay(company.stage);
+
+                        return (
+                          <div
+                            key={company.company_id}
+                            className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:border-brand-blue transition"
+                          >
+                            {company.company_logo ? (
+                              <img
+                                src={company.company_logo}
+                                alt={company.company_name}
+                                className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                <span className="text-lg font-semibold text-gray-500">
+                                  {company.company_name?.charAt(0) || "C"}
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-900 truncate">
+                                {company.company_name}
+                              </p>
+                              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${stageDisplay.color}`}>
+                                {stageDisplay.label}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 {/* HUMBLE FLEX card(s) */}
                 <div className="bg-white border border-gray-200 rounded-2xl p-6 mr-2">
                   <h3 className="text-xl font-semibold text-gray-900 mb-4">
@@ -688,17 +835,70 @@ export default function StudentPortal() {
                     </div>
                   )}
                 </div>
+
+                {/* SIDE PROJECTS card */}
+                {(profile.sideProjects || profile.sideProjectLink) && (
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 mr-2">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                      Side Projects
+                    </h3>
+
+                    {profile.sideProjects && (
+                      <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap mb-4">
+                        {profile.sideProjects}
+                      </p>
+                    )}
+
+                    {profile.sideProjectLink && (
+                      <a
+                        href={normalizeUrl(profile.sideProjectLink) || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white transition text-sm font-medium"
+                      >
+                        <span>View Project</span>
+                        <span>↗</span>
+                      </a>
+                    )}
+                  </div>
+                )}
               </section>
             </div>
           </>
         )}
         {activeTab === "messages" && (
-          <div className="mx-2 mt-6">
-            <MessagesSection
-              role="student"
-              studentId={studentId ?? undefined}
-            />
-          </div>
+          <>
+            <div className="w-full flex items-center justify-between py-6 px-2">
+              <h1 className="font-sans text-3xl font-bold text-gray-900">Messages</h1>
+            </div>
+            <div className="mx-2">
+              <MessagesSection
+                role="student"
+                studentId={studentId ?? undefined}
+              />
+            </div>
+          </>
+        )}
+        {activeTab === "notifications" && (
+          <>
+            <div className="w-full flex items-center justify-between py-6 px-2">
+              <h1 className="font-sans text-3xl font-bold text-gray-900">Notifications</h1>
+            </div>
+            <div className="mx-2">
+              {studentId ? (
+                <NotificationsComponent
+                  studentId={studentId}
+                  onNavigateToMessages={() => {
+                    setActiveTab("messages");
+                  }}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Loading...</p>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
       {isEditOpen ? (

@@ -93,6 +93,17 @@ export default function PipelineKanban({ companyId }: PipelineKanbanProps) {
 
   const updateStage = async (studentId: string, newStage: Stage, newNotes?: string) => {
     try {
+      // Get the old stage before updating
+      const { data: existingPipeline } = await supabase
+        .from("student_pipeline")
+        .select("stage")
+        .eq("company_id", companyId)
+        .eq("student_id", studentId)
+        .single();
+
+      const oldStage = existingPipeline?.stage;
+
+      // Update the stage
       const { error } = await supabase
         .from("student_pipeline")
         .upsert(
@@ -111,6 +122,29 @@ export default function PipelineKanban({ companyId }: PipelineKanbanProps) {
       if (error) {
         console.error("Error updating stage:", error);
         return;
+      }
+
+      // Create notification if stage changed
+      if (oldStage && oldStage !== newStage) {
+        const stageLabels: { [key: string]: string } = {
+          shortlisted: "Shortlisted",
+          contacted: "Contacted",
+          interviewing: "Interviewing",
+          hired: "Hired",
+          not_a_fit: "Not a Fit",
+        };
+
+        const message = `Your application status has been updated to ${stageLabels[newStage] || newStage}`;
+
+        await supabase.from("notifications").insert({
+          student_id: studentId,
+          company_id: companyId,
+          message: message,
+          type: "stage_change",
+          old_stage: oldStage,
+          new_stage: newStage,
+          read: false,
+        });
       }
 
       await loadPipeline();

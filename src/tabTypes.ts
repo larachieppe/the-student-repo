@@ -1,4 +1,4 @@
-export type StudentTabKey = "companies" | "profile" | "messages";
+export type StudentTabKey = "companies" | "profile" | "messages" | "notifications";
 export type BusinessTabKey = "students" | "shortlist" | "messages" | "profile" | "pipeline";
 export type AdminTabKey = "students" | "accounts" | "analytics";
 

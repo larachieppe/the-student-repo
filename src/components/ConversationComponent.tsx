@@ -227,22 +227,29 @@ export default function MessagesSection({
           const newMessage = payload.new as any;
           const myType = isBusinessUser ? "businessUsers" : "students";
 
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: newMessage.id,
-              conversationId: newMessage.conversation_id,
-              from: newMessage.sender === myType ? "me" : "them",
-              text: newMessage.content,
-              timestamp: new Date(newMessage.created_at).toLocaleTimeString(
-                [],
-                {
-                  hour: "numeric",
-                  minute: "2-digit",
-                }
-              ),
-            },
-          ]);
+          setMessages((prev) => {
+            // Check if message already exists (from optimistic update)
+            if (prev.some((m) => m.id === newMessage.id)) {
+              return prev;
+            }
+
+            return [
+              ...prev,
+              {
+                id: newMessage.id,
+                conversationId: newMessage.conversation_id,
+                from: newMessage.sender === myType ? "me" : "them",
+                text: newMessage.content,
+                timestamp: new Date(newMessage.created_at).toLocaleTimeString(
+                  [],
+                  {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  }
+                ),
+              },
+            ];
+          });
         }
       )
       .subscribe();
@@ -281,7 +288,7 @@ export default function MessagesSection({
       business_id: conv.company_id,
     };
 
-    const { error } = await supabase
+    const { data: newMessage, error } = await supabase
       .from("messages")
       .insert(messagePayload)
       .select()
@@ -298,7 +305,40 @@ export default function MessagesSection({
       .update({ updated_at: new Date().toISOString() })
       .eq("id", selectedId);
 
-    // Don't add to local state here - let the realtime subscription handle it
+    // Create notification for student if message is from business user
+    if (isBusinessUser && conv.student_id && conv.company_id) {
+      const messagePreview = draft.trim().length > 50
+        ? draft.trim().substring(0, 50) + "..."
+        : draft.trim();
+
+      await supabase.from("notifications").insert({
+        student_id: conv.student_id,
+        company_id: conv.company_id,
+        conversation_id: selectedId,
+        message: `New message: ${messagePreview}`,
+        type: "message",
+        read: false,
+      });
+    }
+
+    // Optimistically add the message to local state for instant UI feedback
+    if (newMessage) {
+      const myType = isBusinessUser ? "businessUsers" : "students";
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newMessage.id,
+          conversationId: newMessage.conversation_id,
+          from: newMessage.sender === myType ? "me" : "them",
+          text: newMessage.content,
+          timestamp: new Date(newMessage.created_at).toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+          }),
+        },
+      ]);
+    }
+
     setDraft("");
   };
 
