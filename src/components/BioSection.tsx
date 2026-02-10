@@ -65,6 +65,7 @@ interface BiosSectionProps {
   shortlist?: StudentProfile[];
   onToggleShortlist?: (student: StudentProfile) => void;
   filterToShortlist?: boolean;
+  showActions?: boolean;
 }
 
 export default function BiosSection({
@@ -74,6 +75,7 @@ export default function BiosSection({
   shortlist = [],
   onToggleShortlist,
   filterToShortlist = false,
+  showActions = true,
 }: BiosSectionProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -252,61 +254,63 @@ export default function BiosSection({
                     </p>
                   </div>
 
-                  {/* Action Icons (unchanged) */}
-                  <div className="flex items-center gap-3">
-                    <button className="rounded-full p-1.5 hover:bg-slate-100" onClick={() => onStartConversation(student.id)}>
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-black"
-                      >
-                        <path d="M21 11.5c0 4-3.7 7.5-8.5 7.5-1.4 0-2.8-.3-4-.9L3 20l1.3-4.1C3.5 14.3 3 12.9 3 11.5 3 7 6.7 3.5 11.5 3.5S21 7 21 11.5z" />
-                      </svg>
-                    </button>
+                  {/* Action Icons */}
+                  {showActions ? (
+                    <div className="flex items-center gap-3">
+                      <button className="rounded-full p-1.5 hover:bg-slate-100" onClick={() => onStartConversation(student.id)}>
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="text-black"
+                        >
+                          <path d="M21 11.5c0 4-3.7 7.5-8.5 7.5-1.4 0-2.8-.3-4-.9L3 20l1.3-4.1C3.5 14.3 3 12.9 3 11.5 3 7 6.7 3.5 11.5 3.5S21 7 21 11.5z" />
+                        </svg>
+                      </button>
 
-                    <button
-                      className="rounded-full p-1.5 hover:bg-slate-100 disabled:opacity-50"
-                      onClick={() => {
-                        if (onToggleShortlist) {
-                          const studentProfile: StudentProfile = {
-                            id: student.id,
-                            name: student.name,
-                            school: `${student.university} '${student.graduationYear?.slice(-2) || ""}`,
-                          };
-                          onToggleShortlist(studentProfile);
-                        }
-                      }}
-                      disabled={!onToggleShortlist}
-                      aria-label={
-                        shortlist.some((s) => s.id === student.id)
-                          ? "Remove from shortlist"
-                          : "Add to shortlist"
-                      }
-                    >
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill={
+                      <button
+                        className="rounded-full p-1.5 hover:bg-slate-100 disabled:opacity-50"
+                        onClick={() => {
+                          if (onToggleShortlist) {
+                            const studentProfile: StudentProfile = {
+                              id: student.id,
+                              name: student.name,
+                              school: `${student.university} '${student.graduationYear?.slice(-2) || ""}`,
+                            };
+                            onToggleShortlist(studentProfile);
+                          }
+                        }}
+                        disabled={!onToggleShortlist}
+                        aria-label={
                           shortlist.some((s) => s.id === student.id)
-                            ? "currentColor"
-                            : "none"
+                            ? "Remove from shortlist"
+                            : "Add to shortlist"
                         }
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
                       >
-                        <path d="M19 21 12 17 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                      </svg>
-                    </button>
-                  </div>
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill={
+                            shortlist.some((s) => s.id === student.id)
+                              ? "currentColor"
+                              : "none"
+                          }
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M19 21 12 17 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Bio */}

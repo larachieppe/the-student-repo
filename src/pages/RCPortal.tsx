@@ -93,8 +93,6 @@ export default function RCPortal() {
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [accountsSearchTerm, setAccountsSearchTerm] = useState("");
   const [accountsFilter, setAccountsFilter] = useState<"all" | "student" | "business" | "admin">("all");
-  const [deleteConfirm, setDeleteConfirm] = useState<{ accountId: string; email: string } | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   // Pagination states
   const [flexCurrentPage, setFlexCurrentPage] = useState(1);
@@ -612,50 +610,6 @@ export default function RCPortal() {
     loadAccounts();
   }, [activeTab, accountsFilter, accountsSearchTerm]);
 
-  // Delete account function
-  const handleDeleteAccount = async (accountId: string) => {
-    if (!deleteConfirm || deleteConfirm.accountId !== accountId) {
-      return;
-    }
-
-    setDeleting(true);
-    try {
-      // Delete from accounts table
-      // Note: This will delete the account record. If you need to also delete
-      // from auth.users, you may need to set up a database function or use
-      // Supabase Admin API on the server side.
-      const { error: deleteError } = await supabase
-        .from("accounts")
-        .delete()
-        .eq("id", accountId);
-
-      if (deleteError) {
-        console.error("Error deleting account:", deleteError);
-        alert(`Failed to delete account: ${deleteError.message}`);
-        return;
-      }
-
-      // Refresh accounts list
-      setAccounts((prev) => prev.filter((acc) => acc.id !== accountId));
-      
-      // Update counts
-      if (deleteConfirm) {
-        const deletedAccount = accounts.find((acc) => acc.id === accountId);
-        if (deletedAccount?.role === "student") {
-          setStudentAccountCount((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
-        } else if (deletedAccount?.role === "business") {
-          setBusinessAccountCount((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
-        }
-      }
-
-      setDeleteConfirm(null);
-    } catch (err) {
-      console.error("Unexpected error deleting account:", err);
-      alert("An unexpected error occurred while deleting the account.");
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   return (
     <div className="flex-1 bg-white font-sans">
@@ -817,6 +771,7 @@ export default function RCPortal() {
                               onToggleShortlist={() =>
                                 toggleShortlist(studentProfile)
                               }
+                              showActions={false}
                             />
                           );
                         })}
@@ -936,6 +891,7 @@ export default function RCPortal() {
                               onToggleShortlist={() =>
                                 toggleShortlist(studentProfile)
                               }
+                              showActions={false}
                             />
                           );
                         })
@@ -1021,6 +977,7 @@ export default function RCPortal() {
                     onStartConversation={handleStartConversation}
                     shortlist={shortlist}
                     onToggleShortlist={toggleShortlist}
+                    showActions={false}
                   />
                 )}
               </>
@@ -1095,9 +1052,6 @@ export default function RCPortal() {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Created
                           </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -1124,62 +1078,10 @@ export default function RCPortal() {
                                 ? new Date(account.created_at).toLocaleDateString()
                                 : "—"}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <button
-                                onClick={() =>
-                                  setDeleteConfirm({
-                                    accountId: account.id,
-                                    email: account.email,
-                                  })
-                                }
-                                className="text-red-600 hover:text-red-900"
-                                disabled={account.id === user?.id}
-                              >
-                                {account.id === user?.id ? (
-                                  <span className="text-gray-400 cursor-not-allowed">
-                                    Current User
-                                  </span>
-                                ) : (
-                                  "Delete"
-                                )}
-                              </button>
-                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                )}
-
-                {/* Delete Confirmation Modal */}
-                {deleteConfirm && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
-                      <h2 className="text-xl font-semibold mb-4">
-                        Confirm Deletion
-                      </h2>
-                      <p className="text-gray-600 mb-6">
-                        Are you sure you want to delete the account for{" "}
-                        <strong>{deleteConfirm.email}</strong>? This action
-                        cannot be undone.
-                      </p>
-                      <div className="flex gap-3 justify-end">
-                        <button
-                          onClick={() => setDeleteConfirm(null)}
-                          disabled={deleting}
-                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => handleDeleteAccount(deleteConfirm.accountId)}
-                          disabled={deleting}
-                          className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
-                        >
-                          {deleting ? "Deleting..." : "Delete Account"}
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
