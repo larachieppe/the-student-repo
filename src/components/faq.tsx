@@ -4,7 +4,16 @@ export default function FAQ() {
   const faqs = [
     {
       q: "What's the history behind Reach Capital?",
-      a: "Reach Capital has its origins in NewSchools Venture Fund (NSVF), where our founding partners began working together and investing in early-stage education technology companies when they launched the NewSchools Seed fund in 2011 and the Zynga co.lab accelerator. The team made over 40 early-stage investments through that fund, including K-12 category leaders such as Newsela, Nearpod (acquired), SchoolMint (acquired), NoRedInk, ClassDojo, and Ellevation (acquired). To grow their impact and continue investing in companies transforming how people learn, grow, and thrive, they spun out of NSVF and founded Reach Capital in 2015. They picked the name Reach to signify the goal of expanding the reach of high-quality learning experiences that increase access to opportunity. Reach has since invested in over 140 companies across learning, health, and work—areas that are essential and interconnected in our mission to enable people to live their best lives.",
+      a: (
+        <div className="space-y-2">
+          <div>
+            Reach Capital has its origins in NewSchools Venture Fund (NSVF), where our founding partners began working together and investing in early-stage education technology companies when they launched the NewSchools Seed fund in 2011 and the Zynga co.lab accelerator. The team made over 40 early-stage investments through that fund, including K-12 category leaders such as Newsela, Nearpod (acquired), SchoolMint (acquired), NoRedInk, ClassDojo, and Ellevation (acquired).
+          </div>
+          <div>
+            To grow their impact and continue investing in companies transforming how people learn, grow, and thrive, they spun out of NSVF and founded Reach Capital in 2015. They picked the name Reach to signify the goal of expanding the reach of high-quality learning experiences that increase access to opportunity. Reach has since invested in over 140 companies across learning, health, and work—areas that are essential and interconnected in our mission to enable people to live their best lives.
+          </div>
+        </div>
+      ),
     },
     {
       q: "What stages do we invest in?",
@@ -20,11 +29,75 @@ export default function FAQ() {
     },
     {
       q: "How can you get in touch with us?",
-      a: "Need marketing collateral? Find our media kit here. Have general questions about early-stage venture capital financing? Email us here. Want to know what's happening at Reach? Subscribe to our newsletter here.",
+      a: (
+        <ul className="list-disc pl-5 space-y-1">
+          <li>
+            Need marketing collateral? Find our media kit{" "}
+            <a
+              href="https://reachcapital.notion.site/reach-capital-media-kit"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:opacity-80"
+            >
+              here
+            </a>
+            .
+          </li>
+          <li>
+            Have general questions about early-stage venture capital financing? Email us{" "}
+            <a
+              href="mailto:info@reachcapital.com"
+              className="underline hover:opacity-80"
+            >
+              here
+            </a>
+            .
+          </li>
+          <li>
+            Want to know what's happening at Reach? Subscribe to our newsletter{" "}
+            <a
+              href="https://thewire.reachcapital.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:opacity-80"
+            >
+              here
+            </a>
+            .
+          </li>
+        </ul>
+      ),
     },
     {
       q: "How can I find a job at a Reach portfolio company?",
-      a: "Check out openings at our portfolio companies here. We also have a jobs community for early-stage technical talent here.",
+      a: (
+        <div className="space-y-2">
+          <div>
+            Check out openings at our portfolio companies{" "}
+            <a
+              href="https://jobs.reachcapital.com/companies"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:opacity-80"
+            >
+              here
+            </a>
+            .
+          </div>
+          <div>
+            We also have a jobs community for early-stage technical talent{" "}
+            <a
+              href="https://repo.reachcapital.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:opacity-80"
+            >
+              here
+            </a>
+            .
+          </div>
+        </div>
+      ),
     },
   ];
 
