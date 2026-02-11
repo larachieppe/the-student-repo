@@ -3,28 +3,28 @@ import { useState } from "react";
 export default function FAQ() {
   const faqs = [
     {
-      q: "filler text this would contain a FAQ",
-      a: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vitae lectus at ipsum cursus feugiat. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Donec convallis sapien vitae orci eleifend, at facilisis libero hendrerit. Integer in orci ac lacus vestibulum tempor.",
+      q: "What's the history behind Reach Capital?",
+      a: "Reach Capital has its origins in NewSchools Venture Fund (NSVF), where our founding partners began working together and investing in early-stage education technology companies when they launched the NewSchools Seed fund in 2011 and the Zynga co.lab accelerator. The team made over 40 early-stage investments through that fund, including K-12 category leaders such as Newsela, Nearpod (acquired), SchoolMint (acquired), NoRedInk, ClassDojo, and Ellevation (acquired). To grow their impact and continue investing in companies transforming how people learn, grow, and thrive, they spun out of NSVF and founded Reach Capital in 2015. They picked the name Reach to signify the goal of expanding the reach of high-quality learning experiences that increase access to opportunity. Reach has since invested in over 140 companies across learning, health, and work—areas that are essential and interconnected in our mission to enable people to live their best lives.",
     },
     {
-      q: "filler text this would contain a FAQ",
-      a: "Suspendisse potenti. Cras non risus a odio vestibulum pulvinar. Vivamus dapibus, justo at tristique malesuada, turpis nibh elementum massa, nec pharetra mi augue nec metus.",
+      q: "What stages do we invest in?",
+      a: "We are an early-stage venture capital firm that typically makes initial investments in Pre-seed, Seed, and Series A rounds.",
     },
     {
-      q: "filler text this would contain a FAQ",
-      a: "Praesent id sagittis nibh. Nulla facilisi. Aliquam erat volutpat. Pellentesque non urna euismod, aliquet arcu non, aliquet nunc.",
+      q: "What is our investment timeline?",
+      a: "A key element of our investment strategy is our ability to make investment decisions in a timely and efficient manner. We apply a high standard of due diligence when evaluating potential investments, but are nimble and can move quickly when necessary.",
     },
     {
-      q: "filler text this would contain a FAQ",
-      a: "Curabitur ut sem id elit dapibus sodales. Integer vulputate libero sed arcu bibendum, a luctus odio ultrices. Quisque a accumsan magna.",
+      q: "How much do we typically invest?",
+      a: "Our check size depends on the stage of the financing round and the company's business model. It typically ranges from $100K for Pre-seed to upwards of $12 million for later-stage startups.",
     },
     {
-      q: "filler text this would contain a FAQ",
-      a: "Mauris eu porttitor lorem. Aenean dignissim, arcu ut pretium mattis, urna arcu sollicitudin arcu, ut hendrerit leo nulla at velit.",
+      q: "How can you get in touch with us?",
+      a: "Need marketing collateral? Find our media kit here. Have general questions about early-stage venture capital financing? Email us here. Want to know what's happening at Reach? Subscribe to our newsletter here.",
     },
     {
-      q: "filler text this would contain a FAQ",
-      a: "Nunc cursus, justo vitae dignissim porta, nunc augue rutrum lorem, vitae feugiat lectus augue nec enim. Donec fermentum ipsum non mi pretium ornare.",
+      q: "How can I find a job at a Reach portfolio company?",
+      a: "Check out openings at our portfolio companies here. We also have a jobs community for early-stage technical talent here.",
     },
   ];
 
