@@ -202,9 +202,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("[OTP] signInWithOtp ok:", res.data);
         return { error: null };
       } else if (role === "admin") {
-        // For admin: check if email domain is reachcapital.com, berkeley.edu, or gmail.com
+        // For admin: check if email domain is reachcapital.com
         const emailDomain = cleanEmail.split("@")[1];
-        const allowedAdminDomains = ["reachcapital.com", "berkeley.edu", "gmail.com"];
+        const allowedAdminDomains = ["reachcapital.com"];
 
         if (!emailDomain) {
           return {
@@ -218,7 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!allowedAdminDomains.includes(emailDomain)) {
           return {
             error: {
-              message: "Admin access is restricted to Reach Capital, Berkeley, and Gmail email addresses.",
+              message: "Admin access is restricted to Reach Capital email addresses.",
             },
           };
         }
